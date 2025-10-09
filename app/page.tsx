@@ -3,6 +3,20 @@
 import { useState, useEffect } from 'react';
 import { defineChain } from 'viem';
 import FunctionCard from './components/FunctionCard';
+import {
+  Box,
+  Container,
+  Heading,
+  VStack,
+  Field,
+  Input,
+  NativeSelectRoot,
+  NativeSelectField,
+  Text,
+  Alert,
+  Spinner,
+  Center,
+} from '@chakra-ui/react';
 
 type Deployment = Record<string, string>; // contract name -> address
 
@@ -243,187 +257,138 @@ export default function Page() {
     : [];
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
-      <h1>GenLayer Contract Explorer</h1>
+    <Container maxW="container.md" py={8}>
+      <Heading mb={6}>GenLayer Contract Explorer</Heading>
 
       {loadingDeployments ? (
-        <div style={{ marginTop: '2rem' }}>Loading deployments...</div>
+        <Center mt={8}>
+          <Spinner size="lg" />
+        </Center>
       ) : (
-        <>
-          <div style={{ marginTop: '2rem' }}>
-            <label htmlFor="fileUpload" style={{ display: 'block', marginBottom: '0.5rem' }}>
-              Load Deployments File:
-            </label>
-            <input
-              id="fileUpload"
+        <VStack gap={4} align="stretch">
+          <Field.Root>
+            <Field.Label>Load Deployments File:</Field.Label>
+            <Input
               type="file"
               accept=".json"
               onChange={handleFileUpload}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                fontSize: '1rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
+              pt={1}
             />
-          </div>
+          </Field.Root>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label htmlFor="abisFolder" style={{ display: 'block', marginBottom: '0.5rem' }}>
-              ABIs Folder Path:
-            </label>
-            <input
-              id="abisFolder"
-              type="text"
+          <Field.Root>
+            <Field.Label>ABIs Folder Path:</Field.Label>
+            <Input
               value={abisFolder}
               onChange={(e) => setAbisFolder(e.target.value)}
               placeholder="/path/to/artifacts"
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                fontSize: '1rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
             />
-          </div>
+          </Field.Root>
 
-          <div style={{ marginTop: '1rem' }}>
-            <label htmlFor="network" style={{ display: 'block', marginBottom: '0.5rem' }}>
-              Select Network:
-            </label>
-            <select
-              id="network"
-              value={selectedNetwork}
-              onChange={(e) => {
-                setSelectedNetwork(e.target.value);
-                setSelectedDeployment('');
-                setSelectedContract('');
-                setError(null);
-              }}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                fontSize: '1rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
-            >
-              <option value="">-- Select a network --</option>
-              {networkNames.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedNetwork && (
-            <div style={{ marginTop: '1rem' }}>
-              <label htmlFor="deployment" style={{ display: 'block', marginBottom: '0.5rem' }}>
-                Select Deployment:
-              </label>
-              <select
-                id="deployment"
-                value={selectedDeployment}
+          <Field.Root>
+            <Field.Label>Select Network:</Field.Label>
+            <NativeSelectRoot>
+              <NativeSelectField
+                value={selectedNetwork}
                 onChange={(e) => {
-                  setSelectedDeployment(e.target.value);
+                  setSelectedNetwork(e.target.value);
+                  setSelectedDeployment('');
                   setSelectedContract('');
                   setError(null);
                 }}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  fontSize: '1rem',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                }}
               >
-                <option value="">-- Select a deployment --</option>
-                {deploymentNames.map((name) => (
+                <option value="">-- Select a network --</option>
+                {networkNames.map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>
                 ))}
-              </select>
-            </div>
+              </NativeSelectField>
+            </NativeSelectRoot>
+          </Field.Root>
+
+          {selectedNetwork && (
+            <Field.Root>
+              <Field.Label>Select Deployment:</Field.Label>
+              <NativeSelectRoot>
+                <NativeSelectField
+                  value={selectedDeployment}
+                  onChange={(e) => {
+                    setSelectedDeployment(e.target.value);
+                    setSelectedContract('');
+                    setError(null);
+                  }}
+                >
+                  <option value="">-- Select a deployment --</option>
+                  {deploymentNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </NativeSelectField>
+              </NativeSelectRoot>
+            </Field.Root>
           )}
 
           {selectedNetwork && selectedDeployment && (
-            <div style={{ marginTop: '1rem' }}>
-              <label htmlFor="contract" style={{ display: 'block', marginBottom: '0.5rem' }}>
-                Select Contract:
-              </label>
-              <select
-                id="contract"
-                value={selectedContract}
-                onChange={(e) => {
-                  setSelectedContract(e.target.value);
-                  setError(null);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  fontSize: '1rem',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                }}
-              >
-                <option value="">-- Select a contract --</option>
-                {contractNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Field.Root>
+              <Field.Label>Select Contract:</Field.Label>
+              <NativeSelectRoot>
+                <NativeSelectField
+                  value={selectedContract}
+                  onChange={(e) => {
+                    setSelectedContract(e.target.value);
+                    setError(null);
+                  }}
+                >
+                  <option value="">-- Select a contract --</option>
+                  {contractNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </NativeSelectField>
+              </NativeSelectRoot>
+            </Field.Root>
           )}
 
-          <div style={{ marginTop: '1rem' }}>
-            <label htmlFor="address" style={{ display: 'block', marginBottom: '0.5rem' }}>
-              Contract Address:
-            </label>
-            <input
-              id="address"
-              type="text"
+          <Field.Root>
+            <Field.Label>Contract Address:</Field.Label>
+            <Input
               value={contractAddress}
               onChange={(e) => setContractAddress(e.target.value)}
               placeholder="0x... or select from deployments above"
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                fontSize: '1rem',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
             />
-          </div>
+          </Field.Root>
 
-        </>
+        </VStack>
       )}
 
       {/* Display error if any */}
       {error && (
-        <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '4px', color: '#c00' }}>
-          {error}
-        </div>
+        <Alert.Root status="error" mt={4}>
+          <Alert.Indicator />
+          <Alert.Title>{error}</Alert.Title>
+        </Alert.Root>
       )}
 
       {/* Loading ABI indicator */}
       {loadingAbi && (
-        <div style={{ marginTop: '2rem', textAlign: 'center', color: '#666' }}>
-          Loading contract ABI...
-        </div>
+        <Center mt={8}>
+          <VStack>
+            <Spinner />
+            <Text color="gray.600">Loading contract ABI...</Text>
+          </VStack>
+        </Center>
       )}
 
       {/* Function List - Swagger-like UI */}
       {contractAbi && contractAddress && readFunctions.length > 0 && (
-        <div style={{ marginTop: '2rem' }}>
-          <h2 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>Available Functions</h2>
-          <div style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
+        <Box mt={8}>
+          <Heading size="lg" mb={2}>Available Functions</Heading>
+          <Text fontSize="sm" color="gray.600" mb={4}>
             {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} available
-          </div>
+          </Text>
           {readFunctions.map((func) => (
             <FunctionCard
               key={func.name}
@@ -433,15 +398,17 @@ export default function Page() {
               chain={genlayerTestnet}
             />
           ))}
-        </div>
+        </Box>
       )}
 
       {/* No functions message */}
       {contractAbi && contractAddress && readFunctions.length === 0 && (
-        <div style={{ marginTop: '2rem', textAlign: 'center', color: '#666' }}>
-          No read functions found in this contract's ABI
-        </div>
+        <Center mt={8}>
+          <Text color="gray.600">
+            No read functions found in this contract's ABI
+          </Text>
+        </Center>
       )}
-    </div>
+    </Container>
   );
 }

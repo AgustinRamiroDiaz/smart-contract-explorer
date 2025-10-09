@@ -2,6 +2,19 @@
 
 import { useState } from 'react';
 import { createPublicClient, http } from 'viem';
+import {
+  Box,
+  Button,
+  Text,
+  Input,
+  Field,
+  VStack,
+  HStack,
+  Badge,
+  Collapsible,
+  Code,
+  Alert,
+} from '@chakra-ui/react';
 
 type AbiInput = {
   name: string;
@@ -85,176 +98,123 @@ export default function FunctionCard({
     }
   };
 
-  const getStateMutabilityColor = () => {
+  const getStateMutabilityColorScheme = () => {
     switch (func.stateMutability) {
-      case 'view': return '#0070f3';
-      case 'pure': return '#7928ca';
-      default: return '#666';
+      case 'view': return 'blue';
+      case 'pure': return 'purple';
+      default: return 'gray';
     }
   };
 
   return (
-    <div style={{
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      marginBottom: '1rem',
-      overflow: 'hidden'
-    }}>
+    <Box borderWidth="1px" borderRadius="lg" overflow="hidden" mb={4}>
       {/* Header */}
-      <div
+      <HStack
         onClick={() => setIsExpanded(!isExpanded)}
-        style={{
-          padding: '1rem',
-          backgroundColor: '#f5f5f5',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
-          userSelect: 'none'
-        }}
+        p={4}
+        bg="gray.50"
+        cursor="pointer"
+        userSelect="none"
+        _hover={{ bg: 'gray.100' }}
       >
-        <span style={{ fontSize: '1.2rem' }}>{isExpanded ? '▼' : '▶'}</span>
-        <span style={{
-          fontWeight: 'bold',
-          fontFamily: 'monospace',
-          flex: 1
-        }}>
+        <Text fontSize="xl">{isExpanded ? '▼' : '▶'}</Text>
+        <Text fontWeight="bold" fontFamily="mono" flex={1}>
           {func.name}
-        </span>
-        <span style={{
-          padding: '0.25rem 0.5rem',
-          borderRadius: '4px',
-          backgroundColor: getStateMutabilityColor(),
-          color: 'white',
-          fontSize: '0.75rem',
-          fontWeight: 'bold',
-          textTransform: 'uppercase'
-        }}>
+        </Text>
+        <Badge colorScheme={getStateMutabilityColorScheme()} textTransform="uppercase">
           {func.stateMutability}
-        </span>
-      </div>
+        </Badge>
+      </HStack>
 
       {/* Expandable Content */}
-      {isExpanded && (
-        <div style={{ padding: '1rem', backgroundColor: 'white' }}>
+      <Collapsible.Root open={isExpanded}>
+        <Collapsible.Content>
+        <Box p={4} bg="white">
           {/* Function Signature */}
-          <div style={{
-            fontFamily: 'monospace',
-            fontSize: '0.9rem',
-            color: '#666',
-            marginBottom: '1rem',
-            padding: '0.5rem',
-            backgroundColor: '#f9f9f9',
-            borderRadius: '4px'
-          }}>
+          <Code
+            display="block"
+            p={2}
+            mb={4}
+            bg="gray.50"
+            borderRadius="md"
+            fontSize="sm"
+            whiteSpace="pre-wrap"
+          >
             {func.name}({func.inputs.map(i => `${i.type} ${i.name}`).join(', ')})
             {func.outputs.length > 0 && (
               <> → ({func.outputs.map(o => o.type).join(', ')})</>
             )}
-          </div>
+          </Code>
 
           {/* Input Fields */}
           {func.inputs.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>Parameters:</div>
+            <VStack gap={3} mb={4} align="stretch">
+              <Text fontWeight="bold">Parameters:</Text>
               {func.inputs.map((input, idx) => (
-                <div key={idx} style={{ marginBottom: '0.75rem' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    marginBottom: '0.25rem',
-                    color: '#333'
-                  }}>
-                    <span style={{ fontWeight: '500' }}>{input.name}</span>
-                    <span style={{
-                      marginLeft: '0.5rem',
-                      color: '#666',
-                      fontFamily: 'monospace',
-                      fontSize: '0.75rem'
-                    }}>
+                <Field.Root key={idx}>
+                  <Field.Label fontSize="sm">
+                    <Text as="span" fontWeight="medium">{input.name}</Text>
+                    <Text as="span" ml={2} color="gray.600" fontFamily="mono" fontSize="xs">
                       ({input.type})
-                    </span>
-                  </label>
-                  <input
-                    type="text"
+                    </Text>
+                  </Field.Label>
+                  <Input
                     value={args[input.name] || ''}
                     onChange={(e) => handleArgChange(input.name, e.target.value)}
                     placeholder={`Enter ${input.type}`}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px',
-                      fontFamily: 'monospace',
-                      fontSize: '0.875rem'
-                    }}
+                    fontFamily="mono"
+                    fontSize="sm"
                   />
-                </div>
+                </Field.Root>
               ))}
-            </div>
+            </VStack>
           )}
 
           {/* Call Button */}
-          <button
+          <Button
             onClick={callFunction}
-            disabled={loading}
-            style={{
-              padding: '0.75rem 1.5rem',
-              backgroundColor: getStateMutabilityColor(),
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1,
-              fontWeight: 'bold',
-              width: '100%'
-            }}
+            isLoading={loading}
+            loadingText="Calling..."
+            colorScheme={getStateMutabilityColorScheme()}
+            width="full"
+            mb={error || result !== null ? 4 : 0}
           >
-            {loading ? 'Calling...' : `Execute`}
-          </button>
+            Execute
+          </Button>
 
           {/* Error Display */}
           {error && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '0.75rem',
-              backgroundColor: '#fee',
-              border: '1px solid #fcc',
-              borderRadius: '4px',
-              color: '#c00',
-              fontSize: '0.875rem'
-            }}>
-              {error}
-            </div>
+            <Alert.Root status="error" borderRadius="md" mb={4}>
+              <Alert.Indicator />
+              <Alert.Title fontSize="sm">{error}</Alert.Title>
+            </Alert.Root>
           )}
 
           {/* Result Display */}
           {result !== null && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '0.75rem',
-              backgroundColor: '#efe',
-              border: '1px solid #cfc',
-              borderRadius: '4px'
-            }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>Result:</div>
-              <pre style={{
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontFamily: 'monospace',
-                fontSize: '0.875rem'
-              }}>
-                {typeof result === 'object'
-                  ? JSON.stringify(result, (_key, value) =>
-                      typeof value === 'bigint' ? value.toString() : value
-                    , 2)
-                  : String(result)}
-              </pre>
-            </div>
+            <Alert.Root status="success" borderRadius="md">
+              <Box width="full">
+                <Text fontWeight="bold" mb={2}>Result:</Text>
+                <Code
+                  display="block"
+                  p={2}
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                  fontSize="sm"
+                  width="full"
+                >
+                  {typeof result === 'object'
+                    ? JSON.stringify(result, (_key, value) =>
+                        typeof value === 'bigint' ? value.toString() : value
+                      , 2)
+                    : String(result)}
+                </Code>
+              </Box>
+            </Alert.Root>
           )}
-        </div>
-      )}
-    </div>
+        </Box>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </Box>
   );
 }
