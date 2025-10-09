@@ -329,7 +329,6 @@ export default function Page() {
         setSelectedDeployment('');
         setSelectedContract('');
         setContractAddress('');
-        setFunctionResult(null);
         setError(null);
       } catch (err) {
         setError('Failed to parse JSON file: ' + (err instanceof Error ? err.message : 'Invalid JSON'));
@@ -452,7 +451,6 @@ export default function Page() {
                 setSelectedNetwork(e.target.value);
                 setSelectedDeployment('');
                 setSelectedContract('');
-                setFunctionResult(null);
                 setError(null);
               }}
               style={{
@@ -483,7 +481,6 @@ export default function Page() {
                 onChange={(e) => {
                   setSelectedDeployment(e.target.value);
                   setSelectedContract('');
-                  setFunctionResult(null);
                   setError(null);
                 }}
                 style={{
@@ -514,7 +511,6 @@ export default function Page() {
                 value={selectedContract}
                 onChange={(e) => {
                   setSelectedContract(e.target.value);
-                  setFunctionResult(null);
                   setError(null);
                 }}
                 style={{
