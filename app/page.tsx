@@ -32,13 +32,16 @@ const genlayerTestnet = defineChain({
 
 export default function Page() {
   const [deploymentsFile, setDeploymentsFile] = useState<DeploymentsFile>({});
+  const [abisFolder, setAbisFolder] = useState('/home/az/genlayer/genlayer-node/third_party/contracts/artifacts');
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [selectedDeployment, setSelectedDeployment] = useState('');
   const [selectedContract, setSelectedContract] = useState('');
   const [contractAddress, setContractAddress] = useState('');
+  const [contractAbi, setContractAbi] = useState<any[] | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingDeployments, setLoadingDeployments] = useState(true);
+  const [loadingAbi, setLoadingAbi] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load deployments on mount
@@ -92,6 +95,33 @@ export default function Page() {
     }
   }, [selectedNetwork, selectedDeployment, selectedContract, deploymentsFile]);
 
+  // Load ABI when contract is selected or abisFolder changes
+  useEffect(() => {
+    if (selectedContract && abisFolder) {
+      setLoadingAbi(true);
+      setContractAbi(null);
+
+      fetch(`/api/abi/${selectedContract}?folder=${encodeURIComponent(abisFolder)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.error) {
+            console.warn('ABI not found for contract:', selectedContract);
+            setContractAbi(null);
+          } else {
+            setContractAbi(data.abi);
+          }
+          setLoadingAbi(false);
+        })
+        .catch((err) => {
+          console.error('Error loading ABI:', err);
+          setContractAbi(null);
+          setLoadingAbi(false);
+        });
+    } else {
+      setContractAbi(null);
+    }
+  }, [selectedContract, abisFolder]);
+
   const networkNames = Object.keys(deploymentsFile);
   const deploymentNames = selectedNetwork
     ? Object.keys(deploymentsFile[selectedNetwork] || {})
@@ -118,21 +148,25 @@ export default function Page() {
         transport: http(),
       });
 
+      // Use loaded ABI if available, otherwise use minimal ABI
+      const abiToUse = contractAbi || [
+        {
+          name: 'owner',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [],
+          outputs: [{ type: 'address' }],
+        },
+      ];
+
       const data = await client.readContract({
         address: contractAddress as `0x${string}`,
-        abi: [
-          {
-            name: 'owner',
-            type: 'function',
-            stateMutability: 'view',
-            inputs: [],
-            outputs: [{ type: 'address' }],
-          },
-        ],
+        abi: abiToUse,
         functionName: 'owner',
+        args: [],
       });
 
-      setOwner(data as string);
+      setOwner(String(data));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to read owner');
     } finally {
@@ -157,6 +191,26 @@ export default function Page() {
               type="file"
               accept=".json"
               onChange={handleFileUpload}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+
+          <div style={{ marginTop: '1rem' }}>
+            <label htmlFor="abisFolder" style={{ display: 'block', marginBottom: '0.5rem' }}>
+              ABIs Folder Path:
+            </label>
+            <input
+              id="abisFolder"
+              type="text"
+              value={abisFolder}
+              onChange={(e) => setAbisFolder(e.target.value)}
+              placeholder="/path/to/artifacts"
               style={{
                 width: '100%',
                 padding: '0.5rem',
