@@ -191,47 +191,33 @@ export default function Page() {
 
   // State to track which contracts have ABIs available
   const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
+  const [loadingAbiList, setLoadingAbiList] = useState(false);
 
-  // Check which ABIs are available when deployment changes
+  // Fetch list of available ABIs from the server
   useEffect(() => {
-    if (!selectedNetwork || !selectedDeployment || !abisFolder) {
+    if (!abisFolder) {
       setAvailableAbis(new Set());
       return;
     }
 
-    const deployment = deploymentsFile[selectedNetwork]?.[selectedDeployment];
-    if (!deployment) {
-      setAvailableAbis(new Set());
-      return;
-    }
+    setLoadingAbiList(true);
 
-    // Get all contract names
-    const contracts = Object.keys(deployment).filter(
-      (key) => deployment[key]?.startsWith('0x')
-    );
-
-    // Check each contract for ABI availability
-    const checkAbis = async () => {
-      const available = new Set<string>();
-      await Promise.all(
-        contracts.map(async (contractName) => {
-          try {
-            const response = await fetch(
-              `/api/abi/${contractName}?folder=${encodeURIComponent(abisFolder)}`
-            );
-            if (response.ok) {
-              available.add(contractName);
-            }
-          } catch (err) {
-            // ABI not available for this contract
-          }
-        })
-      );
-      setAvailableAbis(available);
-    };
-
-    checkAbis();
-  }, [selectedNetwork, selectedDeployment, abisFolder, deploymentsFile]);
+    fetch(`/api/abis/list?folder=${encodeURIComponent(abisFolder)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.contracts) {
+          setAvailableAbis(new Set(data.contracts));
+        } else {
+          setAvailableAbis(new Set());
+        }
+        setLoadingAbiList(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching ABI list:', err);
+        setAvailableAbis(new Set());
+        setLoadingAbiList(false);
+      });
+  }, [abisFolder]);
 
   const networkNames = Object.keys(deploymentsFile);
   const deploymentNames = selectedNetwork
@@ -332,7 +318,14 @@ export default function Page() {
 
           {selectedNetwork && selectedDeployment && (
             <Field.Root>
-              <Field.Label>Select Contract:</Field.Label>
+              <Field.Label>
+                Select Contract:
+                {loadingAbiList && (
+                  <Text as="span" ml={2} fontSize="xs" color="gray.500">
+                    (Loading available contracts...)
+                  </Text>
+                )}
+              </Field.Label>
               <NativeSelectRoot>
                 <NativeSelectField
                   value={selectedContract}
@@ -340,8 +333,11 @@ export default function Page() {
                     setSelectedContract(e.target.value);
                     setError(null);
                   }}
+                  disabled={loadingAbiList}
                 >
-                  <option value="">-- Select a contract --</option>
+                  <option value="">
+                    {loadingAbiList ? 'Loading...' : contractNames.length === 0 ? 'No contracts with ABIs found' : '-- Select a contract --'}
+                  </option>
                   {contractNames.map((name) => (
                     <option key={name} value={name}>
                       {name}
@@ -349,6 +345,11 @@ export default function Page() {
                   ))}
                 </NativeSelectField>
               </NativeSelectRoot>
+              {!loadingAbiList && contractNames.length > 0 && (
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  {contractNames.length} contract{contractNames.length !== 1 ? 's' : ''} with available ABIs
+                </Text>
+              )}
             </Field.Root>
           )}
 
