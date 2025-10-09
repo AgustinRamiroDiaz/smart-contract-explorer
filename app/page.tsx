@@ -30,6 +30,14 @@ const genlayerTestnet = defineChain({
   },
 });
 
+type AbiFunction = {
+  name: string;
+  type: string;
+  stateMutability: string;
+  inputs: any[];
+  outputs: any[];
+};
+
 export default function Page() {
   const [deploymentsFile, setDeploymentsFile] = useState<DeploymentsFile>({});
   const [abisFolder, setAbisFolder] = useState('/home/az/genlayer/genlayer-node/third_party/contracts/artifacts');
@@ -38,7 +46,8 @@ export default function Page() {
   const [selectedContract, setSelectedContract] = useState('');
   const [contractAddress, setContractAddress] = useState('');
   const [contractAbi, setContractAbi] = useState<any[] | null>(null);
-  const [owner, setOwner] = useState<string | null>(null);
+  const [selectedFunction, setSelectedFunction] = useState<string>('');
+  const [functionResult, setFunctionResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [loadingDeployments, setLoadingDeployments] = useState(true);
   const [loadingAbi, setLoadingAbi] = useState(false);
@@ -76,7 +85,7 @@ export default function Page() {
         setSelectedDeployment('');
         setSelectedContract('');
         setContractAddress('');
-        setOwner(null);
+        setFunctionResult(null);
         setError(null);
       } catch (err) {
         setError('Failed to parse JSON file: ' + (err instanceof Error ? err.message : 'Invalid JSON'));
@@ -132,15 +141,36 @@ export default function Page() {
       )
     : [];
 
-  const readOwner = async () => {
+  // Get read functions from ABI (view and pure functions)
+  const readFunctions: AbiFunction[] = contractAbi
+    ? contractAbi.filter(
+        (item: any) =>
+          item.type === 'function' &&
+          (item.stateMutability === 'view' || item.stateMutability === 'pure')
+      )
+    : [];
+
+  const selectedFunctionAbi = readFunctions.find((fn) => fn.name === selectedFunction);
+
+  const callFunction = async () => {
     if (!contractAddress) {
       setError('Please enter a contract address');
       return;
     }
 
+    if (!selectedFunction) {
+      setError('Please select a function to call');
+      return;
+    }
+
+    if (!selectedFunctionAbi) {
+      setError('Function ABI not found');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    setOwner(null);
+    setFunctionResult(null);
 
     try {
       const client = createPublicClient({
@@ -148,27 +178,16 @@ export default function Page() {
         transport: http(),
       });
 
-      // Use loaded ABI if available, otherwise use minimal ABI
-      const abiToUse = contractAbi || [
-        {
-          name: 'owner',
-          type: 'function',
-          stateMutability: 'view',
-          inputs: [],
-          outputs: [{ type: 'address' }],
-        },
-      ];
-
       const data = await client.readContract({
         address: contractAddress as `0x${string}`,
-        abi: abiToUse,
-        functionName: 'owner',
+        abi: contractAbi || [],
+        functionName: selectedFunction,
         args: [],
       });
 
-      setOwner(String(data));
+      setFunctionResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to read owner');
+      setError(err instanceof Error ? err.message : 'Failed to call function');
     } finally {
       setLoading(false);
     }
@@ -232,7 +251,7 @@ export default function Page() {
                 setSelectedNetwork(e.target.value);
                 setSelectedDeployment('');
                 setSelectedContract('');
-                setOwner(null);
+                setFunctionResult(null);
                 setError(null);
               }}
               style={{
@@ -263,7 +282,7 @@ export default function Page() {
                 onChange={(e) => {
                   setSelectedDeployment(e.target.value);
                   setSelectedContract('');
-                  setOwner(null);
+                  setFunctionResult(null);
                   setError(null);
                 }}
                 style={{
@@ -294,7 +313,7 @@ export default function Page() {
                 value={selectedContract}
                 onChange={(e) => {
                   setSelectedContract(e.target.value);
-                  setOwner(null);
+                  setFunctionResult(null);
                   setError(null);
                 }}
                 style={{
@@ -334,26 +353,72 @@ export default function Page() {
               }}
             />
           </div>
+
+          {contractAbi && readFunctions.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <label htmlFor="function" style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Select Function to Call:
+              </label>
+              <select
+                id="function"
+                value={selectedFunction}
+                onChange={(e) => {
+                  setSelectedFunction(e.target.value);
+                  setFunctionResult(null);
+                  setError(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                }}
+              >
+                <option value="">-- Select a function --</option>
+                {readFunctions.map((fn) => (
+                  <option key={fn.name} value={fn.name}>
+                    {fn.name}({fn.inputs.map((i) => i.type).join(', ')})
+                    {fn.outputs.length > 0 && ` → ${fn.outputs.map((o) => o.type).join(', ')}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {loadingAbi && (
+            <div style={{ marginTop: '1rem', color: '#666' }}>
+              Loading ABI...
+            </div>
+          )}
+
+          {contractAbi && readFunctions.length === 0 && (
+            <div style={{ marginTop: '1rem', color: '#666' }}>
+              No read functions found in ABI
+            </div>
+          )}
         </>
       )}
 
-      <button
-        onClick={readOwner}
-        disabled={loading}
-        style={{
-          marginTop: '1rem',
-          padding: '0.75rem 1.5rem',
-          fontSize: '1rem',
-          backgroundColor: '#0070f3',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.6 : 1,
-        }}
-      >
-        {loading ? 'Reading...' : 'Read Owner'}
-      </button>
+      {selectedFunction && (
+        <button
+          onClick={callFunction}
+          disabled={loading}
+          style={{
+            marginTop: '1rem',
+            padding: '0.75rem 1.5rem',
+            fontSize: '1rem',
+            backgroundColor: '#0070f3',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          {loading ? 'Calling...' : `Call ${selectedFunction}`}
+        </button>
+      )}
 
       {error && (
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '4px', color: '#c00' }}>
@@ -361,9 +426,16 @@ export default function Page() {
         </div>
       )}
 
-      {owner && (
+      {functionResult !== null && (
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#efe', border: '1px solid #cfc', borderRadius: '4px' }}>
-          <strong>Owner:</strong> {owner}
+          <strong>Result:</strong>
+          <pre style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {typeof functionResult === 'object'
+              ? JSON.stringify(functionResult, (key, value) =>
+                  typeof value === 'bigint' ? value.toString() : value
+                , 2)
+              : String(functionResult)}
+          </pre>
         </div>
       )}
     </div>
