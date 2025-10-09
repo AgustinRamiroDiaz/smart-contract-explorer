@@ -1,8 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPublicClient, http } from 'viem';
 import { defineChain } from 'viem';
+
+type Deployment = Record<string, string>; // contract name -> address
+
+type Network = Record<string, Deployment>; // deployment name -> deployment
+
+type DeploymentsFile = Record<string, Network>; // network name -> network
 
 // Define GenLayer Testnet
 const genlayerTestnet = defineChain({
@@ -25,10 +31,76 @@ const genlayerTestnet = defineChain({
 });
 
 export default function Page() {
+  const [deploymentsFile, setDeploymentsFile] = useState<DeploymentsFile>({});
+  const [selectedNetwork, setSelectedNetwork] = useState('');
+  const [selectedDeployment, setSelectedDeployment] = useState('');
+  const [selectedContract, setSelectedContract] = useState('');
   const [contractAddress, setContractAddress] = useState('');
   const [owner, setOwner] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingDeployments, setLoadingDeployments] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Load deployments on mount
+  useEffect(() => {
+    fetch('/api/deployments')
+      .then((res) => res.json())
+      .then((data: DeploymentsFile) => {
+        if (data.error) {
+          setError('Failed to load deployments: ' + data.error);
+        } else {
+          setDeploymentsFile(data);
+        }
+        setLoadingDeployments(false);
+      })
+      .catch((err) => {
+        setError('Failed to load deployments: ' + err.message);
+        setLoadingDeployments(false);
+      });
+  }, []);
+
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        setDeploymentsFile(data);
+        setSelectedNetwork('');
+        setSelectedDeployment('');
+        setSelectedContract('');
+        setContractAddress('');
+        setOwner(null);
+        setError(null);
+      } catch (err) {
+        setError('Failed to parse JSON file: ' + (err instanceof Error ? err.message : 'Invalid JSON'));
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Update contract address when deployment or contract is selected
+  useEffect(() => {
+    if (selectedNetwork && selectedDeployment && selectedContract) {
+      const address = deploymentsFile[selectedNetwork]?.[selectedDeployment]?.[selectedContract];
+      if (address && address.startsWith('0x')) {
+        setContractAddress(address);
+      }
+    }
+  }, [selectedNetwork, selectedDeployment, selectedContract, deploymentsFile]);
+
+  const networkNames = Object.keys(deploymentsFile);
+  const deploymentNames = selectedNetwork
+    ? Object.keys(deploymentsFile[selectedNetwork] || {})
+    : [];
+  const contractNames = selectedNetwork && selectedDeployment
+    ? Object.keys(deploymentsFile[selectedNetwork]?.[selectedDeployment] || {}).filter(
+        (key) => deploymentsFile[selectedNetwork][selectedDeployment][key]?.startsWith('0x')
+      )
+    : [];
 
   const readOwner = async () => {
     if (!contractAddress) {
@@ -72,25 +144,144 @@ export default function Page() {
     <div style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
       <h1>GenLayer Contract Explorer</h1>
 
-      <div style={{ marginTop: '2rem' }}>
-        <label htmlFor="address" style={{ display: 'block', marginBottom: '0.5rem' }}>
-          Contract Address:
-        </label>
-        <input
-          id="address"
-          type="text"
-          value={contractAddress}
-          onChange={(e) => setContractAddress(e.target.value)}
-          placeholder="0x..."
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            fontSize: '1rem',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-          }}
-        />
-      </div>
+      {loadingDeployments ? (
+        <div style={{ marginTop: '2rem' }}>Loading deployments...</div>
+      ) : (
+        <>
+          <div style={{ marginTop: '2rem' }}>
+            <label htmlFor="fileUpload" style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Load Deployments File:
+            </label>
+            <input
+              id="fileUpload"
+              type="file"
+              accept=".json"
+              onChange={handleFileUpload}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+
+          <div style={{ marginTop: '1rem' }}>
+            <label htmlFor="network" style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Select Network:
+            </label>
+            <select
+              id="network"
+              value={selectedNetwork}
+              onChange={(e) => {
+                setSelectedNetwork(e.target.value);
+                setSelectedDeployment('');
+                setSelectedContract('');
+                setOwner(null);
+                setError(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            >
+              <option value="">-- Select a network --</option>
+              {networkNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedNetwork && (
+            <div style={{ marginTop: '1rem' }}>
+              <label htmlFor="deployment" style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Select Deployment:
+              </label>
+              <select
+                id="deployment"
+                value={selectedDeployment}
+                onChange={(e) => {
+                  setSelectedDeployment(e.target.value);
+                  setSelectedContract('');
+                  setOwner(null);
+                  setError(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                }}
+              >
+                <option value="">-- Select a deployment --</option>
+                {deploymentNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {selectedNetwork && selectedDeployment && (
+            <div style={{ marginTop: '1rem' }}>
+              <label htmlFor="contract" style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Select Contract:
+              </label>
+              <select
+                id="contract"
+                value={selectedContract}
+                onChange={(e) => {
+                  setSelectedContract(e.target.value);
+                  setOwner(null);
+                  setError(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  fontSize: '1rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                }}
+              >
+                <option value="">-- Select a contract --</option>
+                {contractNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ marginTop: '1rem' }}>
+            <label htmlFor="address" style={{ display: 'block', marginBottom: '0.5rem' }}>
+              Contract Address:
+            </label>
+            <input
+              id="address"
+              type="text"
+              value={contractAddress}
+              onChange={(e) => setContractAddress(e.target.value)}
+              placeholder="0x... or select from deployments above"
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+            />
+          </div>
+        </>
+      )}
 
       <button
         onClick={readOwner}
