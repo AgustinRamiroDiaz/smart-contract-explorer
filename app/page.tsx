@@ -306,6 +306,29 @@ export default function Page() {
           setError('Failed to load deployments: ' + data.error);
         } else {
           setDeploymentsFile(data);
+
+          // Auto-select if only one network
+          const networks = Object.keys(data);
+          if (networks.length === 1) {
+            const savedNetwork = localStorage.getItem('selectedNetwork');
+            const savedDeployment = localStorage.getItem('selectedDeployment');
+
+            setSelectedNetwork(savedNetwork || networks[0]);
+            if (savedDeployment && data[savedNetwork || networks[0]]?.[savedDeployment]) {
+              setSelectedDeployment(savedDeployment);
+            }
+          } else {
+            // Restore from localStorage if available
+            const savedNetwork = localStorage.getItem('selectedNetwork');
+            const savedDeployment = localStorage.getItem('selectedDeployment');
+
+            if (savedNetwork && data[savedNetwork]) {
+              setSelectedNetwork(savedNetwork);
+              if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
+                setSelectedDeployment(savedDeployment);
+              }
+            }
+          }
         }
         setLoadingDeployments(false);
       })
@@ -336,6 +359,19 @@ export default function Page() {
     };
     reader.readAsText(file);
   };
+
+  // Save network and deployment to localStorage when changed
+  useEffect(() => {
+    if (selectedNetwork) {
+      localStorage.setItem('selectedNetwork', selectedNetwork);
+    }
+  }, [selectedNetwork]);
+
+  useEffect(() => {
+    if (selectedDeployment) {
+      localStorage.setItem('selectedDeployment', selectedDeployment);
+    }
+  }, [selectedDeployment]);
 
   // Update contract address when deployment or contract is selected
   useEffect(() => {
@@ -374,13 +410,61 @@ export default function Page() {
     }
   }, [selectedContract, abisFolder]);
 
+  // State to track which contracts have ABIs available
+  const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
+
+  // Check which ABIs are available when deployment changes
+  useEffect(() => {
+    if (!selectedNetwork || !selectedDeployment || !abisFolder) {
+      setAvailableAbis(new Set());
+      return;
+    }
+
+    const deployment = deploymentsFile[selectedNetwork]?.[selectedDeployment];
+    if (!deployment) {
+      setAvailableAbis(new Set());
+      return;
+    }
+
+    // Get all contract names
+    const contracts = Object.keys(deployment).filter(
+      (key) => deployment[key]?.startsWith('0x')
+    );
+
+    // Check each contract for ABI availability
+    const checkAbis = async () => {
+      const available = new Set<string>();
+      await Promise.all(
+        contracts.map(async (contractName) => {
+          try {
+            const response = await fetch(
+              `/api/abi/${contractName}?folder=${encodeURIComponent(abisFolder)}`
+            );
+            if (response.ok) {
+              available.add(contractName);
+            }
+          } catch (err) {
+            // ABI not available for this contract
+          }
+        })
+      );
+      setAvailableAbis(available);
+    };
+
+    checkAbis();
+  }, [selectedNetwork, selectedDeployment, abisFolder, deploymentsFile]);
+
   const networkNames = Object.keys(deploymentsFile);
   const deploymentNames = selectedNetwork
     ? Object.keys(deploymentsFile[selectedNetwork] || {})
     : [];
   const contractNames = selectedNetwork && selectedDeployment
     ? Object.keys(deploymentsFile[selectedNetwork]?.[selectedDeployment] || {}).filter(
-        (key) => deploymentsFile[selectedNetwork][selectedDeployment][key]?.startsWith('0x')
+        (key) => {
+          const hasAddress = deploymentsFile[selectedNetwork][selectedDeployment][key]?.startsWith('0x');
+          const hasAbi = availableAbis.has(key);
+          return hasAddress && hasAbi;
+        }
       )
     : [];
 
