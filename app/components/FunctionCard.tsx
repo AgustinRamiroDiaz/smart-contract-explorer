@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { createPublicClient, http } from 'viem';
+import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import {
   Box,
   Button,
@@ -55,11 +56,34 @@ export default function FunctionCard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { isConnected } = useAccount();
+  const { writeContract, data: hash, isPending: isWritePending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
+
   const handleArgChange = (paramName: string, value: string) => {
     setArgs(prev => ({ ...prev, [paramName]: value }));
   };
 
-  const callFunction = async () => {
+  // Convert args to array in correct order
+  const getArgsArray = () => {
+    return func.inputs.map(input => {
+      const value = args[input.name] || '';
+      // Basic type conversion
+      if (input.type.includes('uint') || input.type.includes('int')) {
+        return value ? BigInt(value) : BigInt(0);
+      }
+      if (input.type === 'bool') {
+        return value.toLowerCase() === 'true';
+      }
+      return value;
+    });
+  };
+
+  const callReadFunction = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
@@ -70,18 +94,7 @@ export default function FunctionCard({
         transport: http(),
       });
 
-      // Convert args to array in correct order
-      const argsArray = func.inputs.map(input => {
-        const value = args[input.name] || '';
-        // Basic type conversion
-        if (input.type.includes('uint') || input.type.includes('int')) {
-          return value ? BigInt(value) : BigInt(0);
-        }
-        if (input.type === 'bool') {
-          return value.toLowerCase() === 'true';
-        }
-        return value;
-      });
+      const argsArray = getArgsArray();
 
       const data = await client.readContract({
         address: contractAddress as `0x${string}`,
@@ -98,11 +111,37 @@ export default function FunctionCard({
     }
   };
 
+  const callWriteFunction = async () => {
+    if (!isConnected) {
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    setError(null);
+    setResult(null);
+
+    try {
+      const argsArray = getArgsArray();
+
+      writeContract({
+        address: contractAddress as `0x${string}`,
+        abi: contractAbi,
+        functionName: func.name,
+        args: argsArray,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send transaction');
+    }
+  };
+
+  const callFunction = isReadFunction ? callReadFunction : callWriteFunction;
+
   const getStateMutabilityColorScheme = () => {
     switch (func.stateMutability) {
       case 'view': return 'blue';
       case 'pure': return 'purple';
-      default: return 'gray';
+      case 'payable': return 'green';
+      default: return 'orange';
     }
   };
 
@@ -173,14 +212,42 @@ export default function FunctionCard({
           {/* Call Button */}
           <Button
             onClick={callFunction}
-            isLoading={loading}
-            loadingText="Calling..."
+            loading={isReadFunction ? loading : (isWritePending || isConfirming)}
+            loadingText={
+              isReadFunction
+                ? "Calling..."
+                : isWritePending
+                ? "Sending transaction..."
+                : "Confirming..."
+            }
             colorScheme={getStateMutabilityColorScheme()}
             width="full"
-            mb={error || result !== null ? 4 : 0}
+            mb={error || result !== null || hash ? 4 : 0}
+            disabled={!isReadFunction && !isConnected}
           >
-            Execute
+            {isReadFunction ? 'Execute' : isConnected ? 'Send Transaction' : 'Connect Wallet to Execute'}
           </Button>
+
+          {/* Write Function Status */}
+          {!isReadFunction && hash && (
+            <Alert.Root status={isConfirmed ? "success" : "info"} borderRadius="md" mb={4}>
+              <Alert.Indicator />
+              <Box width="full">
+                <Text fontWeight="bold" mb={1}>
+                  {isConfirming ? 'Transaction Pending' : isConfirmed ? 'Transaction Confirmed' : 'Transaction Sent'}
+                </Text>
+                <Code
+                  display="block"
+                  p={2}
+                  fontSize="xs"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-all"
+                >
+                  {hash}
+                </Code>
+              </Box>
+            </Alert.Root>
+          )}
 
           {/* Error Display */}
           {error && (
@@ -190,8 +257,8 @@ export default function FunctionCard({
             </Alert.Root>
           )}
 
-          {/* Result Display */}
-          {result !== null && (
+          {/* Result Display (for read functions) */}
+          {result !== null && isReadFunction && (
             <Alert.Root status="success" borderRadius="md">
               <Box width="full">
                 <Text fontWeight="bold" mb={2}>Result:</Text>

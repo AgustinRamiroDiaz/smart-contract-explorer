@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { defineChain } from 'viem';
+import { ConnectButton } from './components/ConnectButton';
 import FunctionCard from './components/FunctionCard';
+import { genlayerTestnet } from './wagmi';
 import {
   Box,
   Container,
@@ -16,6 +17,7 @@ import {
   Alert,
   Spinner,
   Center,
+  HStack,
 } from '@chakra-ui/react';
 
 type Deployment = Record<string, string>; // contract name -> address
@@ -35,26 +37,6 @@ type AbiOutput = {
   type: string;
   internalType?: string;
 };
-
-// Define GenLayer Testnet
-const genlayerTestnet = defineChain({
-  id: 123420000220,
-  name: 'GenLayer Testnet',
-  network: 'genlayer-testnet',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'GenLayer',
-    symbol: 'GEN',
-  },
-  rpcUrls: {
-    default: {
-      http: ['https://genlayer-testnet.rpc.caldera.xyz/http'],
-    },
-    public: {
-      http: ['https://genlayer-testnet.rpc.caldera.xyz/http'],
-    },
-  },
-});
 
 type AbiFunction = {
   name: string;
@@ -233,18 +215,25 @@ export default function Page() {
       )
     : [];
 
-  // Get read functions from ABI (view and pure functions)
-  const readFunctions: AbiFunction[] = contractAbi
-    ? contractAbi.filter(
-        (item: any) =>
-          item.type === 'function' &&
-          (item.stateMutability === 'view' || item.stateMutability === 'pure')
-      )
+  // Get all functions from ABI
+  const allFunctions: AbiFunction[] = contractAbi
+    ? contractAbi.filter((item: any) => item.type === 'function')
     : [];
+
+  // Separate read and write functions
+  const readFunctions = allFunctions.filter(
+    (func) => func.stateMutability === 'view' || func.stateMutability === 'pure'
+  );
+  const writeFunctions = allFunctions.filter(
+    (func) => func.stateMutability !== 'view' && func.stateMutability !== 'pure'
+  );
 
   return (
     <Container maxW="container.md" py={8}>
-      <Heading mb={6}>GenLayer Contract Explorer</Heading>
+      <HStack justify="space-between" mb={6}>
+        <Heading>GenLayer Contract Explorer</Heading>
+        <ConnectButton />
+      </HStack>
 
       {loadingDeployments ? (
         <Center mt={8}>
@@ -326,14 +315,13 @@ export default function Page() {
                   </Text>
                 )}
               </Field.Label>
-              <NativeSelectRoot>
+              <NativeSelectRoot disabled={loadingAbiList}>
                 <NativeSelectField
                   value={selectedContract}
                   onChange={(e) => {
                     setSelectedContract(e.target.value);
                     setError(null);
                   }}
-                  disabled={loadingAbiList}
                 >
                   <option value="">
                     {loadingAbiList ? 'Loading...' : contractNames.length === 0 ? 'No contracts with ABIs found' : '-- Select a contract --'}
@@ -384,29 +372,53 @@ export default function Page() {
       )}
 
       {/* Function List - Swagger-like UI */}
-      {contractAbi && contractAddress && readFunctions.length > 0 && (
+      {contractAbi && contractAddress && allFunctions.length > 0 && (
         <Box mt={8}>
-          <Heading size="lg" mb={2}>Available Functions</Heading>
-          <Text fontSize="sm" color="gray.600" mb={4}>
-            {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} available
-          </Text>
-          {readFunctions.map((func) => (
-            <FunctionCard
-              key={func.name}
-              func={func}
-              contractAddress={contractAddress}
-              contractAbi={contractAbi}
-              chain={genlayerTestnet}
-            />
-          ))}
+          {/* Write Functions */}
+          {writeFunctions.length > 0 && (
+            <Box mb={8}>
+              <Heading size="lg" mb={2}>Write Functions</Heading>
+              <Text fontSize="sm" color="gray.600" mb={4}>
+                {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} available
+              </Text>
+              {writeFunctions.map((func) => (
+                <FunctionCard
+                  key={func.name}
+                  func={func}
+                  contractAddress={contractAddress}
+                  contractAbi={contractAbi}
+                  chain={genlayerTestnet}
+                />
+              ))}
+            </Box>
+          )}
+
+          {/* Read Functions */}
+          {readFunctions.length > 0 && (
+            <Box>
+              <Heading size="lg" mb={2}>Read Functions</Heading>
+              <Text fontSize="sm" color="gray.600" mb={4}>
+                {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} available
+              </Text>
+              {readFunctions.map((func) => (
+                <FunctionCard
+                  key={func.name}
+                  func={func}
+                  contractAddress={contractAddress}
+                  contractAbi={contractAbi}
+                  chain={genlayerTestnet}
+                />
+              ))}
+            </Box>
+          )}
         </Box>
       )}
 
       {/* No functions message */}
-      {contractAbi && contractAddress && readFunctions.length === 0 && (
+      {contractAbi && contractAddress && allFunctions.length === 0 && (
         <Center mt={8}>
           <Text color="gray.600">
-            No read functions found in this contract's ABI
+            No functions found in this contract's ABI
           </Text>
         </Center>
       )}

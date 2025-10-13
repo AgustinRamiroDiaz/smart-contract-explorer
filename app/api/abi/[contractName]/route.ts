@@ -4,7 +4,7 @@ import { join } from 'path';
 
 export async function GET(
   request: Request,
-  { params }: { params: { contractName: string } }
+  { params }: { params: Promise<{ contractName: string }> }
 ) {
   try {
     // Get folder from query param or fallback to env variable
@@ -19,7 +19,7 @@ export async function GET(
       );
     }
 
-    const contractName = params.contractName;
+    const { contractName } = await params;
     const abiPath = join(abisFolder, `${contractName}.sol`, `${contractName}.json`);
 
     const data = await readFile(abiPath, 'utf-8');
