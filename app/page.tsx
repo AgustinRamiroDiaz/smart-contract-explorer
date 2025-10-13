@@ -20,6 +20,7 @@ import {
   HStack,
   Grid,
   GridItem,
+  Button,
 } from '@chakra-ui/react';
 
 type Deployment = Record<string, string>; // contract name -> address
@@ -50,58 +51,47 @@ type AbiFunction = {
 
 export default function Page() {
   const [deploymentsFile, setDeploymentsFile] = useState<DeploymentsFile>({});
-  const [abisFolder, setAbisFolder] = useState('/home/az/genlayer/genlayer-node/third_party/contracts/artifacts');
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [selectedDeployment, setSelectedDeployment] = useState('');
   const [selectedContract, setSelectedContract] = useState('');
   const [contractAddress, setContractAddress] = useState('');
   const [contractAbi, setContractAbi] = useState<any[] | null>(null);
-  const [loadingDeployments, setLoadingDeployments] = useState(true);
   const [loadingAbi, setLoadingAbi] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [abisFolderHandle, setAbisFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
+  const [loadingAbiList, setLoadingAbiList] = useState(false);
 
-  // Load deployments on mount
+  // Restore deployments and selections from localStorage on mount
   useEffect(() => {
-    fetch('/api/deployments')
-      .then((res) => res.json())
-      .then((data: DeploymentsFile) => {
-        if (data.error) {
-          setError('Failed to load deployments: ' + data.error);
-        } else {
-          setDeploymentsFile(data);
+    const savedDeployments = localStorage.getItem('deploymentsFile');
 
-          // Auto-select if only one network
-          const networks = Object.keys(data);
-          if (networks.length === 1) {
-            const savedNetwork = localStorage.getItem('selectedNetwork');
-            const savedDeployment = localStorage.getItem('selectedDeployment');
+    if (savedDeployments) {
+      try {
+        const data = JSON.parse(savedDeployments);
+        setDeploymentsFile(data);
 
-            setSelectedNetwork(savedNetwork || networks[0]);
-            if (savedDeployment && data[savedNetwork || networks[0]]?.[savedDeployment]) {
+        const networks = Object.keys(data);
+        if (networks.length > 0) {
+          const savedNetwork = localStorage.getItem('selectedNetwork');
+          const savedDeployment = localStorage.getItem('selectedDeployment');
+
+          if (savedNetwork && data[savedNetwork]) {
+            setSelectedNetwork(savedNetwork);
+            if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
               setSelectedDeployment(savedDeployment);
             }
-          } else {
-            // Restore from localStorage if available
-            const savedNetwork = localStorage.getItem('selectedNetwork');
-            const savedDeployment = localStorage.getItem('selectedDeployment');
-
-            if (savedNetwork && data[savedNetwork]) {
-              setSelectedNetwork(savedNetwork);
-              if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
-                setSelectedDeployment(savedDeployment);
-              }
-            }
+          } else if (networks.length === 1) {
+            setSelectedNetwork(networks[0]);
           }
         }
-        setLoadingDeployments(false);
-      })
-      .catch((err) => {
-        setError('Failed to load deployments: ' + err.message);
-        setLoadingDeployments(false);
-      });
+      } catch (err) {
+        console.error('Failed to parse saved deployments:', err);
+      }
+    }
   }, []);
 
-  // Handle file upload
+  // Handle deployments file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -111,6 +101,7 @@ export default function Page() {
       try {
         const data = JSON.parse(e.target?.result as string);
         setDeploymentsFile(data);
+        localStorage.setItem('deploymentsFile', JSON.stringify(data));
         setSelectedNetwork('');
         setSelectedDeployment('');
         setSelectedContract('');
@@ -121,6 +112,52 @@ export default function Page() {
       }
     };
     reader.readAsText(file);
+  };
+
+  // Handle ABIs folder selection
+  const handleSelectAbisFolder = async () => {
+    try {
+      // @ts-ignore - File System Access API
+      const dirHandle = await window.showDirectoryPicker();
+      setAbisFolderHandle(dirHandle);
+
+      // Scan the folder for available ABIs
+      await scanAbisFolder(dirHandle);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        setError('Failed to open folder: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      }
+    }
+  };
+
+  // Scan the ABIs folder for available contracts
+  const scanAbisFolder = async (dirHandle: FileSystemDirectoryHandle) => {
+    setLoadingAbiList(true);
+    const foundAbis = new Set<string>();
+
+    try {
+      // @ts-ignore
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'directory' && entry.name.endsWith('.sol')) {
+          const contractName = entry.name.replace('.sol', '');
+
+          try {
+            // Check if the contract's JSON file exists
+            await entry.getFileHandle(`${contractName}.json`);
+            foundAbis.add(contractName);
+          } catch {
+            // File doesn't exist, skip
+          }
+        }
+      }
+
+      setAvailableAbis(foundAbis);
+    } catch (err) {
+      console.error('Error scanning ABIs folder:', err);
+      setError('Failed to scan folder: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setLoadingAbiList(false);
+    }
   };
 
   // Save network and deployment to localStorage when changed
@@ -146,63 +183,48 @@ export default function Page() {
     }
   }, [selectedNetwork, selectedDeployment, selectedContract, deploymentsFile]);
 
-  // Load ABI when contract is selected or abisFolder changes
+  // Load ABI when contract is selected
   useEffect(() => {
-    if (selectedContract && abisFolder) {
-      setLoadingAbi(true);
-      setContractAbi(null);
-
-      fetch(`/api/abi/${selectedContract}?folder=${encodeURIComponent(abisFolder)}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.error) {
-            console.warn('ABI not found for contract:', selectedContract);
-            setContractAbi(null);
-          } else {
-            setContractAbi(data.abi);
-          }
-          setLoadingAbi(false);
-        })
-        .catch((err) => {
-          console.error('Error loading ABI:', err);
-          setContractAbi(null);
-          setLoadingAbi(false);
-        });
+    if (selectedContract && abisFolderHandle) {
+      loadAbiFromFolder(selectedContract);
     } else {
       setContractAbi(null);
     }
-  }, [selectedContract, abisFolder]);
+  }, [selectedContract, abisFolderHandle]);
 
-  // State to track which contracts have ABIs available
-  const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
-  const [loadingAbiList, setLoadingAbiList] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  // Load ABI from the selected folder
+  const loadAbiFromFolder = async (contractName: string) => {
+    if (!abisFolderHandle) return;
 
-  // Fetch list of available ABIs from the server
-  useEffect(() => {
-    if (!abisFolder) {
-      setAvailableAbis(new Set());
-      return;
+    setLoadingAbi(true);
+    try {
+      // @ts-ignore
+      const solDir = await abisFolderHandle.getDirectoryHandle(`${contractName}.sol`);
+      // @ts-ignore
+      const jsonFile = await solDir.getFileHandle(`${contractName}.json`);
+      const file = await jsonFile.getFile();
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Handle both raw ABI arrays and artifact objects with an abi field
+      const abi = Array.isArray(data) ? data : data.abi;
+
+      if (!abi || !Array.isArray(abi)) {
+        setError('Invalid ABI file format');
+        setContractAbi(null);
+      } else {
+        setContractAbi(abi);
+        setError(null);
+      }
+    } catch (err) {
+      console.error('Error loading ABI:', err);
+      setContractAbi(null);
+    } finally {
+      setLoadingAbi(false);
     }
+  };
 
-    setLoadingAbiList(true);
-
-    fetch(`/api/abis/list?folder=${encodeURIComponent(abisFolder)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.contracts) {
-          setAvailableAbis(new Set(data.contracts));
-        } else {
-          setAvailableAbis(new Set());
-        }
-        setLoadingAbiList(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching ABI list:', err);
-        setAvailableAbis(new Set());
-        setLoadingAbiList(false);
-      });
-  }, [abisFolder]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const networkNames = Object.keys(deploymentsFile);
   const deploymentNames = selectedNetwork
@@ -265,12 +287,7 @@ export default function Page() {
               <Heading size="md" mb={4}>Configuration</Heading>
             </Box>
 
-            {loadingDeployments ? (
-              <Center py={8}>
-                <Spinner size="lg" />
-              </Center>
-            ) : (
-              <>
+            <>
                 <Field.Root>
                   <Field.Label fontSize="sm" fontWeight="semibold">Load Deployments File:</Field.Label>
                   <Input
@@ -284,14 +301,25 @@ export default function Page() {
                 </Field.Root>
 
                 <Field.Root>
-                  <Field.Label fontSize="sm" fontWeight="semibold">ABIs Folder Path:</Field.Label>
-                  <Input
-                    value={abisFolder}
-                    onChange={(e) => setAbisFolder(e.target.value)}
-                    placeholder="/path/to/artifacts"
-                    bg="white"
-                    fontSize="sm"
-                  />
+                  <Field.Label fontSize="sm" fontWeight="semibold">ABIs Folder:</Field.Label>
+                  <Button
+                    onClick={handleSelectAbisFolder}
+                    size="sm"
+                    width="full"
+                    variant="outline"
+                  >
+                    {abisFolderHandle ? `📁 ${abisFolderHandle.name}` : 'Select ABIs Folder'}
+                  </Button>
+                  {loadingAbiList && (
+                    <Text fontSize="xs" color="gray.600" mt={1}>
+                      Scanning folder...
+                    </Text>
+                  )}
+                  {!loadingAbiList && availableAbis.size > 0 && (
+                    <Text fontSize="xs" color="green.600" mt={1}>
+                      ✓ Found {availableAbis.size} ABI{availableAbis.size !== 1 ? 's' : ''}
+                    </Text>
+                  )}
                 </Field.Root>
 
                 <Field.Root>
@@ -361,7 +389,13 @@ export default function Page() {
                         bg="white"
                       >
                         <option value="">
-                          {loadingAbiList ? 'Loading...' : contractNames.length === 0 ? 'No contracts with ABIs found' : '-- Select a contract --'}
+                          {!abisFolderHandle
+                            ? 'Select ABIs folder first'
+                            : loadingAbiList
+                            ? 'Loading...'
+                            : contractNames.length === 0
+                            ? 'No contracts with ABIs found'
+                            : '-- Select a contract --'}
                         </option>
                         {contractNames.map((name) => (
                           <option key={name} value={name}>
@@ -390,7 +424,6 @@ export default function Page() {
                   />
                 </Field.Root>
               </>
-            )}
 
             {/* Display error if any */}
             {error && (
