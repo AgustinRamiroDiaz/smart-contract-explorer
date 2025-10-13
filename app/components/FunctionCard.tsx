@@ -16,6 +16,7 @@ import {
   Code,
   Alert,
 } from '@chakra-ui/react';
+import { JsonEditor } from 'json-edit-react';
 
 type AbiInput = {
   name: string;
@@ -42,6 +43,22 @@ interface FunctionCardProps {
   contractAddress: string;
   contractAbi: any[];
   chain: any;
+}
+
+// Utility function to convert BigInts to strings for JSON display
+function serializeBigInts(obj: any): any {
+  if (typeof obj === 'bigint') {
+    return obj.toString();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(serializeBigInts);
+  }
+  if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj).map(([key, value]) => [key, serializeBigInts(value)])
+    );
+  }
+  return obj;
 }
 
 export default function FunctionCard({
@@ -262,20 +279,27 @@ export default function FunctionCard({
             <Alert.Root status="success" borderRadius="md">
               <Box width="full">
                 <Text fontWeight="bold" mb={2}>Result:</Text>
-                <Code
-                  display="block"
+                <Box
                   p={2}
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-word"
+                  bg="gray.50"
+                  borderRadius="md"
                   fontSize="sm"
                   width="full"
+                  overflowX="auto"
                 >
-                  {typeof result === 'object'
-                    ? JSON.stringify(result, (_key, value) =>
-                        typeof value === 'bigint' ? value.toString() : value
-                      , 2)
-                    : String(result)}
-                </Code>
+                  {typeof result === 'object' ? (
+                    <JsonEditor
+                      data={serializeBigInts(result)}
+                      setData={() => {}}
+                      rootName="result"
+                      restrictEdit={true}
+                      restrictDelete={true}
+                      restrictAdd={true}
+                    />
+                  ) : (
+                    <Code>{String(result)}</Code>
+                  )}
+                </Box>
               </Box>
             </Alert.Root>
           )}
