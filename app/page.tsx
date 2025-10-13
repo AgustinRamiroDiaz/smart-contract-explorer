@@ -176,6 +176,7 @@ export default function Page() {
   // State to track which contracts have ABIs available
   const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
   const [loadingAbiList, setLoadingAbiList] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch list of available ABIs from the server
   useEffect(() => {
@@ -223,12 +224,22 @@ export default function Page() {
     : [];
 
   // Separate read and write functions
-  const readFunctions = allFunctions.filter(
+  const allReadFunctions = allFunctions.filter(
     (func) => func.stateMutability === 'view' || func.stateMutability === 'pure'
   );
-  const writeFunctions = allFunctions.filter(
+  const allWriteFunctions = allFunctions.filter(
     (func) => func.stateMutability !== 'view' && func.stateMutability !== 'pure'
   );
+
+  // Filter functions based on search term
+  const filterBySearch = (funcs: AbiFunction[]) => {
+    if (!searchTerm.trim()) return funcs;
+    const lowerSearch = searchTerm.toLowerCase();
+    return funcs.filter(func => func.name.toLowerCase().includes(lowerSearch));
+  };
+
+  const readFunctions = filterBySearch(allReadFunctions);
+  const writeFunctions = filterBySearch(allWriteFunctions);
 
   return (
     <Box minH="100vh">
@@ -394,6 +405,27 @@ export default function Page() {
         {/* Main Panel */}
         <GridItem overflowY="auto" bg="white">
           <Container maxW="container.lg" py={6}>
+            {/* Search Bar */}
+            {contractAbi && contractAddress && allFunctions.length > 0 && (
+              <Box mb={6}>
+                <Field.Root>
+                  <Field.Label fontWeight="semibold">Search Functions</Field.Label>
+                  <Input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by function name..."
+                    size="lg"
+                    fontFamily="mono"
+                  />
+                  {searchTerm && (
+                    <Text fontSize="xs" color="gray.600" mt={1}>
+                      Showing {readFunctions.length + writeFunctions.length} of {allFunctions.length} function{allFunctions.length !== 1 ? 's' : ''}
+                    </Text>
+                  )}
+                </Field.Root>
+              </Box>
+            )}
+
             {/* Loading ABI indicator */}
             {loadingAbi && (
               <Center py={12}>
@@ -406,45 +438,60 @@ export default function Page() {
 
             {/* Function List */}
             {contractAbi && contractAddress && allFunctions.length > 0 && (
-              <VStack gap={8} align="stretch">
-                {/* Write Functions */}
-                {writeFunctions.length > 0 && (
-                  <Box>
-                    <Heading size="lg" mb={2}>Write Functions</Heading>
-                    <Text fontSize="sm" color="gray.600" mb={4}>
-                      {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} available
-                    </Text>
-                    {writeFunctions.map((func) => (
-                      <FunctionCard
-                        key={func.name}
-                        func={func}
-                        contractAddress={contractAddress}
-                        contractAbi={contractAbi}
-                        chain={genlayerTestnet}
-                      />
-                    ))}
-                  </Box>
-                )}
+              <>
+                {readFunctions.length === 0 && writeFunctions.length === 0 ? (
+                  <Center py={12}>
+                    <VStack gap={2}>
+                      <Text color="gray.500" fontSize="lg">
+                        No functions found matching "{searchTerm}"
+                      </Text>
+                      <Text color="gray.400" fontSize="sm">
+                        Try a different search term
+                      </Text>
+                    </VStack>
+                  </Center>
+                ) : (
+                  <VStack gap={8} align="stretch">
+                    {/* Write Functions */}
+                    {writeFunctions.length > 0 && (
+                      <Box>
+                        <Heading size="lg" mb={2}>Write Functions</Heading>
+                        <Text fontSize="sm" color="gray.600" mb={4}>
+                          {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
+                        </Text>
+                        {writeFunctions.map((func) => (
+                          <FunctionCard
+                            key={func.name}
+                            func={func}
+                            contractAddress={contractAddress}
+                            contractAbi={contractAbi}
+                            chain={genlayerTestnet}
+                          />
+                        ))}
+                      </Box>
+                    )}
 
-                {/* Read Functions */}
-                {readFunctions.length > 0 && (
-                  <Box>
-                    <Heading size="lg" mb={2}>Read Functions</Heading>
-                    <Text fontSize="sm" color="gray.600" mb={4}>
-                      {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} available
-                    </Text>
-                    {readFunctions.map((func) => (
-                      <FunctionCard
-                        key={func.name}
-                        func={func}
-                        contractAddress={contractAddress}
-                        contractAbi={contractAbi}
-                        chain={genlayerTestnet}
-                      />
-                    ))}
-                  </Box>
+                    {/* Read Functions */}
+                    {readFunctions.length > 0 && (
+                      <Box>
+                        <Heading size="lg" mb={2}>Read Functions</Heading>
+                        <Text fontSize="sm" color="gray.600" mb={4}>
+                          {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
+                        </Text>
+                        {readFunctions.map((func) => (
+                          <FunctionCard
+                            key={func.name}
+                            func={func}
+                            contractAddress={contractAddress}
+                            contractAbi={contractAbi}
+                            chain={genlayerTestnet}
+                          />
+                        ))}
+                      </Box>
+                    )}
+                  </VStack>
                 )}
-              </VStack>
+              </>
             )}
 
             {/* No functions message */}
