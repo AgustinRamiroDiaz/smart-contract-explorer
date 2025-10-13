@@ -18,6 +18,8 @@ import {
   Spinner,
   Center,
   HStack,
+  Grid,
+  GridItem,
 } from '@chakra-ui/react';
 
 type Deployment = Record<string, string>; // contract name -> address
@@ -229,199 +231,247 @@ export default function Page() {
   );
 
   return (
-    <Container maxW="container.md" py={8}>
-      <HStack justify="space-between" mb={6}>
-        <Heading>GenLayer Contract Explorer</Heading>
-        <ConnectButton />
-      </HStack>
+    <Box minH="100vh">
+      {/* Header */}
+      <Box borderBottomWidth="1px" bg="white" px={6} py={4}>
+        <HStack justify="space-between">
+          <Heading size="lg">GenLayer Contract Explorer</Heading>
+          <ConnectButton />
+        </HStack>
+      </Box>
 
-      {loadingDeployments ? (
-        <Center mt={8}>
-          <Spinner size="lg" />
-        </Center>
-      ) : (
-        <VStack gap={4} align="stretch">
-          <Field.Root>
-            <Field.Label>Load Deployments File:</Field.Label>
-            <Input
-              type="file"
-              accept=".json"
-              onChange={handleFileUpload}
-              pt={1}
-            />
-          </Field.Root>
-
-          <Field.Root>
-            <Field.Label>ABIs Folder Path:</Field.Label>
-            <Input
-              value={abisFolder}
-              onChange={(e) => setAbisFolder(e.target.value)}
-              placeholder="/path/to/artifacts"
-            />
-          </Field.Root>
-
-          <Field.Root>
-            <Field.Label>Select Network:</Field.Label>
-            <NativeSelectRoot>
-              <NativeSelectField
-                value={selectedNetwork}
-                onChange={(e) => {
-                  setSelectedNetwork(e.target.value);
-                  setSelectedDeployment('');
-                  setSelectedContract('');
-                  setError(null);
-                }}
-              >
-                <option value="">-- Select a network --</option>
-                {networkNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </NativeSelectField>
-            </NativeSelectRoot>
-          </Field.Root>
-
-          {selectedNetwork && (
-            <Field.Root>
-              <Field.Label>Select Deployment:</Field.Label>
-              <NativeSelectRoot>
-                <NativeSelectField
-                  value={selectedDeployment}
-                  onChange={(e) => {
-                    setSelectedDeployment(e.target.value);
-                    setSelectedContract('');
-                    setError(null);
-                  }}
-                >
-                  <option value="">-- Select a deployment --</option>
-                  {deploymentNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </NativeSelectField>
-              </NativeSelectRoot>
-            </Field.Root>
-          )}
-
-          {selectedNetwork && selectedDeployment && (
-            <Field.Root>
-              <Field.Label>
-                Select Contract:
-                {loadingAbiList && (
-                  <Text as="span" ml={2} fontSize="xs" color="gray.500">
-                    (Loading available contracts...)
-                  </Text>
-                )}
-              </Field.Label>
-              <NativeSelectRoot disabled={loadingAbiList}>
-                <NativeSelectField
-                  value={selectedContract}
-                  onChange={(e) => {
-                    setSelectedContract(e.target.value);
-                    setError(null);
-                  }}
-                >
-                  <option value="">
-                    {loadingAbiList ? 'Loading...' : contractNames.length === 0 ? 'No contracts with ABIs found' : '-- Select a contract --'}
-                  </option>
-                  {contractNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </NativeSelectField>
-              </NativeSelectRoot>
-              {!loadingAbiList && contractNames.length > 0 && (
-                <Text fontSize="xs" color="gray.500" mt={1}>
-                  {contractNames.length} contract{contractNames.length !== 1 ? 's' : ''} with available ABIs
-                </Text>
-              )}
-            </Field.Root>
-          )}
-
-          <Field.Root>
-            <Field.Label>Contract Address:</Field.Label>
-            <Input
-              value={contractAddress}
-              onChange={(e) => setContractAddress(e.target.value)}
-              placeholder="0x... or select from deployments above"
-            />
-          </Field.Root>
-
-        </VStack>
-      )}
-
-      {/* Display error if any */}
-      {error && (
-        <Alert.Root status="error" mt={4}>
-          <Alert.Indicator />
-          <Alert.Title>{error}</Alert.Title>
-        </Alert.Root>
-      )}
-
-      {/* Loading ABI indicator */}
-      {loadingAbi && (
-        <Center mt={8}>
-          <VStack>
-            <Spinner />
-            <Text color="gray.600">Loading contract ABI...</Text>
-          </VStack>
-        </Center>
-      )}
-
-      {/* Function List - Swagger-like UI */}
-      {contractAbi && contractAddress && allFunctions.length > 0 && (
-        <Box mt={8}>
-          {/* Write Functions */}
-          {writeFunctions.length > 0 && (
-            <Box mb={8}>
-              <Heading size="lg" mb={2}>Write Functions</Heading>
-              <Text fontSize="sm" color="gray.600" mb={4}>
-                {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} available
-              </Text>
-              {writeFunctions.map((func) => (
-                <FunctionCard
-                  key={func.name}
-                  func={func}
-                  contractAddress={contractAddress}
-                  contractAbi={contractAbi}
-                  chain={genlayerTestnet}
-                />
-              ))}
-            </Box>
-          )}
-
-          {/* Read Functions */}
-          {readFunctions.length > 0 && (
+      {/* Main Layout */}
+      <Grid templateColumns="350px 1fr" h="calc(100vh - 73px)">
+        {/* Sidebar */}
+        <GridItem
+          bg="gray.50"
+          borderRightWidth="1px"
+          p={6}
+          overflowY="auto"
+        >
+          <VStack gap={4} align="stretch">
             <Box>
-              <Heading size="lg" mb={2}>Read Functions</Heading>
-              <Text fontSize="sm" color="gray.600" mb={4}>
-                {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} available
-              </Text>
-              {readFunctions.map((func) => (
-                <FunctionCard
-                  key={func.name}
-                  func={func}
-                  contractAddress={contractAddress}
-                  contractAbi={contractAbi}
-                  chain={genlayerTestnet}
-                />
-              ))}
+              <Heading size="md" mb={4}>Configuration</Heading>
             </Box>
-          )}
-        </Box>
-      )}
 
-      {/* No functions message */}
-      {contractAbi && contractAddress && allFunctions.length === 0 && (
-        <Center mt={8}>
-          <Text color="gray.600">
-            No functions found in this contract's ABI
-          </Text>
-        </Center>
-      )}
-    </Container>
+            {loadingDeployments ? (
+              <Center py={8}>
+                <Spinner size="lg" />
+              </Center>
+            ) : (
+              <>
+                <Field.Root>
+                  <Field.Label fontSize="sm" fontWeight="semibold">Load Deployments File:</Field.Label>
+                  <Input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    pt={1}
+                    bg="white"
+                    fontSize="sm"
+                  />
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label fontSize="sm" fontWeight="semibold">ABIs Folder Path:</Field.Label>
+                  <Input
+                    value={abisFolder}
+                    onChange={(e) => setAbisFolder(e.target.value)}
+                    placeholder="/path/to/artifacts"
+                    bg="white"
+                    fontSize="sm"
+                  />
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label fontSize="sm" fontWeight="semibold">Select Network:</Field.Label>
+                  <NativeSelectRoot size="sm">
+                    <NativeSelectField
+                      value={selectedNetwork}
+                      onChange={(e) => {
+                        setSelectedNetwork(e.target.value);
+                        setSelectedDeployment('');
+                        setSelectedContract('');
+                        setError(null);
+                      }}
+                      bg="white"
+                    >
+                      <option value="">-- Select a network --</option>
+                      {networkNames.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </NativeSelectField>
+                  </NativeSelectRoot>
+                </Field.Root>
+
+                {selectedNetwork && (
+                  <Field.Root>
+                    <Field.Label fontSize="sm" fontWeight="semibold">Select Deployment:</Field.Label>
+                    <NativeSelectRoot size="sm">
+                      <NativeSelectField
+                        value={selectedDeployment}
+                        onChange={(e) => {
+                          setSelectedDeployment(e.target.value);
+                          setSelectedContract('');
+                          setError(null);
+                        }}
+                        bg="white"
+                      >
+                        <option value="">-- Select a deployment --</option>
+                        {deploymentNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </NativeSelectField>
+                    </NativeSelectRoot>
+                  </Field.Root>
+                )}
+
+                {selectedNetwork && selectedDeployment && (
+                  <Field.Root>
+                    <Field.Label fontSize="sm" fontWeight="semibold">
+                      Select Contract:
+                      {loadingAbiList && (
+                        <Text as="span" ml={2} fontSize="xs" color="gray.500" fontWeight="normal">
+                          (Loading...)
+                        </Text>
+                      )}
+                    </Field.Label>
+                    <NativeSelectRoot size="sm" disabled={loadingAbiList}>
+                      <NativeSelectField
+                        value={selectedContract}
+                        onChange={(e) => {
+                          setSelectedContract(e.target.value);
+                          setError(null);
+                        }}
+                        bg="white"
+                      >
+                        <option value="">
+                          {loadingAbiList ? 'Loading...' : contractNames.length === 0 ? 'No contracts with ABIs found' : '-- Select a contract --'}
+                        </option>
+                        {contractNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </NativeSelectField>
+                    </NativeSelectRoot>
+                    {!loadingAbiList && contractNames.length > 0 && (
+                      <Text fontSize="xs" color="gray.600" mt={1}>
+                        {contractNames.length} contract{contractNames.length !== 1 ? 's' : ''} available
+                      </Text>
+                    )}
+                  </Field.Root>
+                )}
+
+                <Field.Root>
+                  <Field.Label fontSize="sm" fontWeight="semibold">Contract Address:</Field.Label>
+                  <Input
+                    value={contractAddress}
+                    onChange={(e) => setContractAddress(e.target.value)}
+                    placeholder="0x..."
+                    bg="white"
+                    fontSize="sm"
+                    fontFamily="mono"
+                  />
+                </Field.Root>
+              </>
+            )}
+
+            {/* Display error if any */}
+            {error && (
+              <Alert.Root status="error" size="sm">
+                <Alert.Indicator />
+                <Alert.Title fontSize="xs">{error}</Alert.Title>
+              </Alert.Root>
+            )}
+          </VStack>
+        </GridItem>
+
+        {/* Main Panel */}
+        <GridItem overflowY="auto" bg="white">
+          <Container maxW="container.lg" py={6}>
+            {/* Loading ABI indicator */}
+            {loadingAbi && (
+              <Center py={12}>
+                <VStack>
+                  <Spinner size="lg" />
+                  <Text color="gray.600">Loading contract ABI...</Text>
+                </VStack>
+              </Center>
+            )}
+
+            {/* Function List */}
+            {contractAbi && contractAddress && allFunctions.length > 0 && (
+              <VStack gap={8} align="stretch">
+                {/* Write Functions */}
+                {writeFunctions.length > 0 && (
+                  <Box>
+                    <Heading size="lg" mb={2}>Write Functions</Heading>
+                    <Text fontSize="sm" color="gray.600" mb={4}>
+                      {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} available
+                    </Text>
+                    {writeFunctions.map((func) => (
+                      <FunctionCard
+                        key={func.name}
+                        func={func}
+                        contractAddress={contractAddress}
+                        contractAbi={contractAbi}
+                        chain={genlayerTestnet}
+                      />
+                    ))}
+                  </Box>
+                )}
+
+                {/* Read Functions */}
+                {readFunctions.length > 0 && (
+                  <Box>
+                    <Heading size="lg" mb={2}>Read Functions</Heading>
+                    <Text fontSize="sm" color="gray.600" mb={4}>
+                      {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} available
+                    </Text>
+                    {readFunctions.map((func) => (
+                      <FunctionCard
+                        key={func.name}
+                        func={func}
+                        contractAddress={contractAddress}
+                        contractAbi={contractAbi}
+                        chain={genlayerTestnet}
+                      />
+                    ))}
+                  </Box>
+                )}
+              </VStack>
+            )}
+
+            {/* No functions message */}
+            {contractAbi && contractAddress && allFunctions.length === 0 && (
+              <Center py={12}>
+                <Text color="gray.600">
+                  No functions found in this contract's ABI
+                </Text>
+              </Center>
+            )}
+
+            {/* Empty state when no contract selected */}
+            {!loadingAbi && !contractAbi && (
+              <Center py={12}>
+                <VStack gap={2}>
+                  <Text color="gray.500" fontSize="lg">
+                    Select a contract from the sidebar to view functions
+                  </Text>
+                  <Text color="gray.400" fontSize="sm">
+                    Configure your deployment and contract settings on the left
+                  </Text>
+                </VStack>
+              </Center>
+            )}
+          </Container>
+        </GridItem>
+      </Grid>
+    </Box>
   );
 }
