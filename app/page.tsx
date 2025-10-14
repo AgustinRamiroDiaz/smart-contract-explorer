@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ConnectButton } from './components/ConnectButton';
 import FunctionCard from './components/FunctionCard';
+import SetupModal from './components/SetupModal';
 import { genlayerTestnet } from './wagmi';
 import {
   Box,
@@ -21,7 +22,9 @@ import {
   Grid,
   GridItem,
   Button,
+  IconButton,
 } from '@chakra-ui/react';
+import { saveFolderHandle, getFolderHandle, requestFolderPermission, clearFolderHandle } from './utils/storage';
 
 type Deployment = Record<string, string>; // contract name -> address
 
@@ -61,34 +64,79 @@ export default function Page() {
   const [abisFolderHandle, setAbisFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
   const [loadingAbiList, setLoadingAbiList] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [initSuccess, setInitSuccess] = useState<string | null>(null);
 
-  // Restore deployments and selections from localStorage on mount
+  // Initialize: Restore deployments and folder handle from storage
   useEffect(() => {
-    const savedDeployments = localStorage.getItem('deploymentsFile');
+    const initialize = async () => {
+      setIsInitializing(true);
+      let hasDeployments = false;
+      let hasFolderHandle = false;
 
-    if (savedDeployments) {
       try {
-        const data = JSON.parse(savedDeployments);
-        setDeploymentsFile(data);
+        // 1. Try to restore deployments from localStorage
+        const savedDeployments = localStorage.getItem('deploymentsFile');
+        if (savedDeployments) {
+          try {
+            const data = JSON.parse(savedDeployments);
+            setDeploymentsFile(data);
+            hasDeployments = true;
 
-        const networks = Object.keys(data);
-        if (networks.length > 0) {
-          const savedNetwork = localStorage.getItem('selectedNetwork');
-          const savedDeployment = localStorage.getItem('selectedDeployment');
+            // Restore network/deployment selections
+            const networks = Object.keys(data);
+            if (networks.length > 0) {
+              const savedNetwork = localStorage.getItem('selectedNetwork');
+              const savedDeployment = localStorage.getItem('selectedDeployment');
 
-          if (savedNetwork && data[savedNetwork]) {
-            setSelectedNetwork(savedNetwork);
-            if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
-              setSelectedDeployment(savedDeployment);
+              if (savedNetwork && data[savedNetwork]) {
+                setSelectedNetwork(savedNetwork);
+                if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
+                  setSelectedDeployment(savedDeployment);
+                }
+              } else if (networks.length === 1) {
+                setSelectedNetwork(networks[0]);
+              }
             }
-          } else if (networks.length === 1) {
-            setSelectedNetwork(networks[0]);
+          } catch (err) {
+            console.error('Failed to parse saved deployments:', err);
           }
         }
+
+        // 2. Try to restore folder handle from IndexedDB
+        const savedHandle = await getFolderHandle();
+        if (savedHandle) {
+          // Request permission for the saved handle
+          const hasPermission = await requestFolderPermission(savedHandle);
+
+          if (hasPermission) {
+            setAbisFolderHandle(savedHandle);
+            await scanAbisFolder(savedHandle);
+            hasFolderHandle = true;
+          } else {
+            // Permission denied, clear the saved handle
+            await clearFolderHandle();
+            console.warn('Permission denied for saved folder');
+          }
+        }
+
+        // 3. Show setup modal if missing configuration
+        if (!hasDeployments || !hasFolderHandle) {
+          setShowSetupModal(true);
+        } else {
+          setInitSuccess('Configuration restored successfully');
+          setTimeout(() => setInitSuccess(null), 3000);
+        }
       } catch (err) {
-        console.error('Failed to parse saved deployments:', err);
+        console.error('Initialization error:', err);
+        setError('Failed to initialize: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      } finally {
+        setIsInitializing(false);
       }
-    }
+    };
+
+    initialize();
   }, []);
 
   // Handle deployments file upload
@@ -121,6 +169,9 @@ export default function Page() {
       const dirHandle = await window.showDirectoryPicker();
       setAbisFolderHandle(dirHandle);
 
+      // Save to IndexedDB for persistence
+      await saveFolderHandle(dirHandle);
+
       // Scan the folder for available ABIs
       await scanAbisFolder(dirHandle);
     } catch (err) {
@@ -128,6 +179,31 @@ export default function Page() {
         setError('Failed to open folder: ' + (err instanceof Error ? err.message : 'Unknown error'));
       }
     }
+  };
+
+  // Handle setup modal completion
+  const handleSetupComplete = async (deploymentsData: any, folderHandle: FileSystemDirectoryHandle) => {
+    // Save deployments if provided
+    if (deploymentsData) {
+      setDeploymentsFile(deploymentsData);
+      localStorage.setItem('deploymentsFile', JSON.stringify(deploymentsData));
+    }
+
+    // Save folder handle if provided
+    if (folderHandle) {
+      setAbisFolderHandle(folderHandle);
+      await saveFolderHandle(folderHandle);
+      await scanAbisFolder(folderHandle);
+    }
+
+    setShowSetupModal(false);
+    setInitSuccess('Configuration saved successfully');
+    setTimeout(() => setInitSuccess(null), 3000);
+  };
+
+  // Handle reconfigure (reset and show modal)
+  const handleReconfigure = async () => {
+    setShowSetupModal(true);
   };
 
   // Scan the ABIs folder for available contracts
@@ -265,6 +341,15 @@ export default function Page() {
 
   return (
     <Box minH="100vh">
+      {/* Setup Modal */}
+      <SetupModal
+        open={showSetupModal}
+        onComplete={handleSetupComplete}
+        onSkip={() => setShowSetupModal(false)}
+        hasDeployments={Object.keys(deploymentsFile).length > 0}
+        hasFolderHandle={abisFolderHandle !== null}
+      />
+
       {/* Header */}
       <Box borderBottomWidth="1px" bg="white" px={6} py={4}>
         <HStack justify="space-between">
@@ -283,11 +368,41 @@ export default function Page() {
           overflowY="auto"
         >
           <VStack gap={4} align="stretch">
-            <Box>
-              <Heading size="md" mb={4}>Configuration</Heading>
-            </Box>
+            <HStack justify="space-between" align="center">
+              <Heading size="md">Configuration</Heading>
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={handleReconfigure}
+                title="Reconfigure settings"
+              >
+                ⚙️ Setup
+              </Button>
+            </HStack>
 
-            <>
+            {/* Initialization Loading */}
+            {isInitializing && (
+              <Center py={4}>
+                <VStack gap={2}>
+                  <Spinner size="md" />
+                  <Text fontSize="sm" color="gray.600">
+                    Initializing...
+                  </Text>
+                </VStack>
+              </Center>
+            )}
+
+            {/* Success Message */}
+            {initSuccess && (
+              <Box p={3} bg="green.50" borderRadius="md" borderWidth="1px" borderColor="green.200">
+                <Text fontSize="sm" color="green.700">
+                  ✓ {initSuccess}
+                </Text>
+              </Box>
+            )}
+
+            {!isInitializing && (
+              <>
                 <Field.Root>
                   <Field.Label fontSize="sm" fontWeight="semibold">Load Deployments File:</Field.Label>
                   <Input
@@ -424,6 +539,7 @@ export default function Page() {
                   />
                 </Field.Root>
               </>
+            )}
 
             {/* Display error if any */}
             {error && (
