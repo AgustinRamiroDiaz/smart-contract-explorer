@@ -14,9 +14,9 @@ import { DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogBody, Dialo
 
 interface SetupModalProps {
   open: boolean;
-  onComplete: (deploymentsData: any, folderHandle: FileSystemDirectoryHandle) => void;
+  onComplete: (fileHandle: FileSystemFileHandle | null, folderHandle: FileSystemDirectoryHandle | null) => void;
   onSkip: () => void;
-  hasDeployments: boolean;
+  hasDeploymentsFile: boolean;
   hasFolderHandle: boolean;
 }
 
@@ -24,29 +24,40 @@ export default function SetupModal({
   open,
   onComplete,
   onSkip,
-  hasDeployments,
+  hasDeploymentsFile,
   hasFolderHandle,
 }: SetupModalProps) {
-  const [deployments, setDeployments] = useState<any>(null);
+  const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [folderHandle, setFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleSelectFile = async () => {
+    try {
+      setLoading(true);
+      // @ts-ignore - File System Access API
+      const [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'JSON Files',
+          accept: { 'application/json': ['.json'] }
+        }],
+        multiple: false
+      });
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        setDeployments(data);
-        setError(null);
-      } catch (err) {
+      // Validate it's a valid JSON file
+      const file = await handle.getFile();
+      const text = await file.text();
+      JSON.parse(text); // Will throw if invalid
+
+      setFileHandle(handle);
+      setError(null);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
         setError('Invalid JSON file: ' + (err instanceof Error ? err.message : 'Unknown error'));
       }
-    };
-    reader.readAsText(file);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSelectFolder = async () => {
@@ -66,8 +77,8 @@ export default function SetupModal({
   };
 
   const handleComplete = () => {
-    if (!deployments && !hasDeployments) {
-      setError('Please upload a deployments file');
+    if (!fileHandle && !hasDeploymentsFile) {
+      setError('Please select a deployments file');
       return;
     }
     if (!folderHandle && !hasFolderHandle) {
@@ -75,10 +86,10 @@ export default function SetupModal({
       return;
     }
 
-    onComplete(deployments, folderHandle!);
+    onComplete(fileHandle, folderHandle);
   };
 
-  const canComplete = (deployments || hasDeployments) && (folderHandle || hasFolderHandle);
+  const canComplete = (fileHandle || hasDeploymentsFile) && (folderHandle || hasFolderHandle);
 
   return (
     <DialogRoot open={open} size="lg">
@@ -101,29 +112,34 @@ export default function SetupModal({
             <Box>
               <Field.Root>
                 <Field.Label fontWeight="semibold">
-                  1. Upload Deployments File
-                  {hasDeployments && (
+                  1. Select Deployments File
+                  {hasDeploymentsFile && (
                     <Text as="span" ml={2} fontSize="sm" color="green.600">
                       ✓ Already configured
                     </Text>
                   )}
                 </Field.Label>
-                <Input
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileUpload}
-                  pt={1}
-                  fontSize="sm"
+                <Button
+                  onClick={handleSelectFile}
+                  width="full"
+                  variant="outline"
                   disabled={loading}
-                />
-                {deployments && (
+                  loading={loading}
+                >
+                  {fileHandle
+                    ? `📄 ${fileHandle.name}`
+                    : hasDeploymentsFile
+                    ? 'Change Deployments File'
+                    : 'Select Deployments File'}
+                </Button>
+                {fileHandle && (
                   <Text fontSize="xs" color="green.600" mt={1}>
-                    ✓ File loaded successfully
+                    ✓ File selected: {fileHandle.name}
                   </Text>
                 )}
-                {hasDeployments && !deployments && (
+                {hasDeploymentsFile && !fileHandle && (
                   <Text fontSize="xs" color="gray.600" mt={1}>
-                    Using existing deployments file (upload a new one to replace)
+                    Using existing deployments file (select a new one to replace)
                   </Text>
                 )}
               </Field.Root>

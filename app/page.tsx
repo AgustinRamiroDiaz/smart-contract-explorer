@@ -24,7 +24,17 @@ import {
   Button,
   IconButton,
 } from '@chakra-ui/react';
-import { saveFolderHandle, getFolderHandle, requestFolderPermission, clearFolderHandle } from './utils/storage';
+import {
+  saveFolderHandle,
+  getFolderHandle,
+  requestFolderPermission,
+  clearFolderHandle,
+  saveFileHandle,
+  getFileHandle,
+  requestFilePermission,
+  clearFileHandle,
+  readJsonFile
+} from './utils/storage';
 
 type Deployment = Record<string, string>; // contract name -> address
 
@@ -54,6 +64,7 @@ type AbiFunction = {
 
 export default function Page() {
   const [deploymentsFile, setDeploymentsFile] = useState<DeploymentsFile>({});
+  const [deploymentsFileHandle, setDeploymentsFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [selectedDeployment, setSelectedDeployment] = useState('');
   const [selectedContract, setSelectedContract] = useState('');
@@ -76,31 +87,43 @@ export default function Page() {
       let hasFolderHandle = false;
 
       try {
-        // 1. Try to restore deployments from localStorage
-        const savedDeployments = localStorage.getItem('deploymentsFile');
-        if (savedDeployments) {
-          try {
-            const data = JSON.parse(savedDeployments);
-            setDeploymentsFile(data);
-            hasDeployments = true;
+        // 1. Try to restore deployments file handle from IndexedDB
+        const savedFileHandle = await getFileHandle();
+        if (savedFileHandle) {
+          // Request permission for the saved file
+          const hasPermission = await requestFilePermission(savedFileHandle);
 
-            // Restore network/deployment selections
-            const networks = Object.keys(data);
-            if (networks.length > 0) {
-              const savedNetwork = localStorage.getItem('selectedNetwork');
-              const savedDeployment = localStorage.getItem('selectedDeployment');
+          if (hasPermission) {
+            try {
+              // Read and parse the file
+              const data = await readJsonFile(savedFileHandle);
+              setDeploymentsFile(data);
+              setDeploymentsFileHandle(savedFileHandle);
+              hasDeployments = true;
 
-              if (savedNetwork && data[savedNetwork]) {
-                setSelectedNetwork(savedNetwork);
-                if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
-                  setSelectedDeployment(savedDeployment);
+              // Restore network/deployment selections
+              const networks = Object.keys(data);
+              if (networks.length > 0) {
+                const savedNetwork = localStorage.getItem('selectedNetwork');
+                const savedDeployment = localStorage.getItem('selectedDeployment');
+
+                if (savedNetwork && data[savedNetwork]) {
+                  setSelectedNetwork(savedNetwork);
+                  if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
+                    setSelectedDeployment(savedDeployment);
+                  }
+                } else if (networks.length === 1) {
+                  setSelectedNetwork(networks[0]);
                 }
-              } else if (networks.length === 1) {
-                setSelectedNetwork(networks[0]);
               }
+            } catch (err) {
+              console.error('Failed to read deployments file:', err);
+              await clearFileHandle();
             }
-          } catch (err) {
-            console.error('Failed to parse saved deployments:', err);
+          } else {
+            // Permission denied, clear the saved handle
+            await clearFileHandle();
+            console.warn('Permission denied for saved deployments file');
           }
         }
 
@@ -139,27 +162,37 @@ export default function Page() {
     initialize();
   }, []);
 
-  // Handle deployments file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // Handle deployments file selection
+  const handleSelectDeploymentsFile = async () => {
+    try {
+      // @ts-ignore - File System Access API
+      const [fileHandle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'JSON Files',
+          accept: { 'application/json': ['.json'] }
+        }],
+        multiple: false
+      });
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        setDeploymentsFile(data);
-        localStorage.setItem('deploymentsFile', JSON.stringify(data));
-        setSelectedNetwork('');
-        setSelectedDeployment('');
-        setSelectedContract('');
-        setContractAddress('');
-        setError(null);
-      } catch (err) {
-        setError('Failed to parse JSON file: ' + (err instanceof Error ? err.message : 'Invalid JSON'));
+      // Read and parse the file
+      const data = await readJsonFile(fileHandle);
+
+      setDeploymentsFile(data);
+      setDeploymentsFileHandle(fileHandle);
+
+      // Save to IndexedDB for persistence
+      await saveFileHandle(fileHandle);
+
+      setSelectedNetwork('');
+      setSelectedDeployment('');
+      setSelectedContract('');
+      setContractAddress('');
+      setError(null);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        setError('Failed to select file: ' + (err instanceof Error ? err.message : 'Unknown error'));
       }
-    };
-    reader.readAsText(file);
+    }
   };
 
   // Handle ABIs folder selection
@@ -182,11 +215,13 @@ export default function Page() {
   };
 
   // Handle setup modal completion
-  const handleSetupComplete = async (deploymentsData: any, folderHandle: FileSystemDirectoryHandle) => {
-    // Save deployments if provided
-    if (deploymentsData) {
-      setDeploymentsFile(deploymentsData);
-      localStorage.setItem('deploymentsFile', JSON.stringify(deploymentsData));
+  const handleSetupComplete = async (fileHandle: FileSystemFileHandle | null, folderHandle: FileSystemDirectoryHandle | null) => {
+    // Save deployments file handle if provided
+    if (fileHandle) {
+      const data = await readJsonFile(fileHandle);
+      setDeploymentsFile(data);
+      setDeploymentsFileHandle(fileHandle);
+      await saveFileHandle(fileHandle);
     }
 
     // Save folder handle if provided
@@ -346,7 +381,7 @@ export default function Page() {
         open={showSetupModal}
         onComplete={handleSetupComplete}
         onSkip={() => setShowSetupModal(false)}
-        hasDeployments={Object.keys(deploymentsFile).length > 0}
+        hasDeploymentsFile={deploymentsFileHandle !== null}
         hasFolderHandle={abisFolderHandle !== null}
       />
 
@@ -404,15 +439,20 @@ export default function Page() {
             {!isInitializing && (
               <>
                 <Field.Root>
-                  <Field.Label fontSize="sm" fontWeight="semibold">Load Deployments File:</Field.Label>
-                  <Input
-                    type="file"
-                    accept=".json"
-                    onChange={handleFileUpload}
-                    pt={1}
-                    bg="white"
-                    fontSize="sm"
-                  />
+                  <Field.Label fontSize="sm" fontWeight="semibold">Deployments File:</Field.Label>
+                  <Button
+                    onClick={handleSelectDeploymentsFile}
+                    size="sm"
+                    width="full"
+                    variant="outline"
+                  >
+                    {deploymentsFileHandle ? `📄 ${deploymentsFileHandle.name}` : 'Select Deployments File'}
+                  </Button>
+                  {deploymentsFileHandle && Object.keys(deploymentsFile).length > 0 && (
+                    <Text fontSize="xs" color="green.600" mt={1}>
+                      ✓ Loaded ({Object.keys(deploymentsFile).length} network{Object.keys(deploymentsFile).length !== 1 ? 's' : ''})
+                    </Text>
+                  )}
                 </Field.Root>
 
                 <Field.Root>
