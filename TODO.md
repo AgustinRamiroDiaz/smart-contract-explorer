@@ -1,3 +1,2 @@
-- add wallet for write transactions: RainbowKit
 - improve UI
-- pre-fetch contract abis
+- 
