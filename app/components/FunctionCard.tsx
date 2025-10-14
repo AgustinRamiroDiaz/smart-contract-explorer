@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPublicClient, http } from 'viem';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import {
@@ -17,6 +17,7 @@ import {
   Alert,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
+import { toaster } from '@/components/ui/toaster';
 
 type AbiInput = {
   name: string;
@@ -121,8 +122,17 @@ export default function FunctionCard({
       });
 
       setResult(data);
+      toaster.success({
+        title: 'Function executed successfully',
+        description: `${func.name}() completed`,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to call function');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to call function';
+      setError(errorMessage);
+      toaster.error({
+        title: 'Function execution failed',
+        description: errorMessage,
+      });
     } finally {
       setLoading(false);
     }
@@ -130,7 +140,12 @@ export default function FunctionCard({
 
   const callWriteFunction = async () => {
     if (!isConnected) {
-      setError('Please connect your wallet first');
+      const errorMessage = 'Please connect your wallet first';
+      setError(errorMessage);
+      toaster.error({
+        title: 'Wallet not connected',
+        description: errorMessage,
+      });
       return;
     }
 
@@ -147,9 +162,33 @@ export default function FunctionCard({
         args: argsArray,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send transaction');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send transaction';
+      setError(errorMessage);
+      toaster.error({
+        title: 'Transaction failed',
+        description: errorMessage,
+      });
     }
   };
+
+  // Show toast notifications for transaction status changes
+  useEffect(() => {
+    if (hash && !isConfirming && !isConfirmed) {
+      toaster.info({
+        title: 'Transaction sent',
+        description: `Transaction ${hash.slice(0, 10)}... has been sent`,
+      });
+    }
+  }, [hash]);
+
+  useEffect(() => {
+    if (isConfirmed && hash) {
+      toaster.success({
+        title: 'Transaction confirmed',
+        description: `${func.name}() executed successfully`,
+      });
+    }
+  }, [isConfirmed, hash, func.name]);
 
   const callFunction = isReadFunction ? callReadFunction : callWriteFunction;
 

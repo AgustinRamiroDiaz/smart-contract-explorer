@@ -36,6 +36,7 @@ import {
   clearFileHandle,
   readJsonFile
 } from './utils/storage';
+import { toaster } from '@/components/ui/toaster';
 
 type Deployment = Record<string, string>; // contract name -> address
 
@@ -78,7 +79,6 @@ export default function Page() {
   const [loadingAbiList, setLoadingAbiList] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showSetupModal, setShowSetupModal] = useState(false);
-  const [initSuccess, setInitSuccess] = useState<string | null>(null);
 
   // Initialize: Restore deployments and folder handle from storage
   useEffect(() => {
@@ -149,8 +149,10 @@ export default function Page() {
         if (!hasDeployments || !hasFolderHandle) {
           setShowSetupModal(true);
         } else {
-          setInitSuccess('Configuration restored successfully');
-          setTimeout(() => setInitSuccess(null), 3000);
+          toaster.success({
+            title: 'Configuration restored',
+            description: 'Successfully restored your settings',
+          });
         }
       } catch (err) {
         console.error('Initialization error:', err);
@@ -233,8 +235,10 @@ export default function Page() {
     }
 
     setShowSetupModal(false);
-    setInitSuccess('Configuration saved successfully');
-    setTimeout(() => setInitSuccess(null), 3000);
+    toaster.success({
+      title: 'Configuration saved',
+      description: 'Your settings have been saved successfully',
+    });
   };
 
   // Handle reconfigure (reset and show modal)
@@ -426,15 +430,6 @@ export default function Page() {
                   </Text>
                 </VStack>
               </Center>
-            )}
-
-            {/* Success Message */}
-            {initSuccess && (
-              <Box p={3} bg="green.50" borderRadius="md" borderWidth="1px" borderColor="green.200">
-                <Text fontSize="sm" color="green.700">
-                  ✓ {initSuccess}
-                </Text>
-              </Box>
             )}
 
             {!isInitializing && (
