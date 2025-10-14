@@ -390,16 +390,8 @@ export default function Page() {
         hasFolderHandle={abisFolderHandle !== null}
       />
 
-      {/* Header */}
-      <Box borderBottomWidth="1px" bg="white" px={6} py={4}>
-        <HStack justify="space-between">
-          <Heading size="lg">GenLayer Contract Explorer</Heading>
-          <ConnectButton />
-        </HStack>
-      </Box>
-
       {/* Main Layout */}
-      <Grid templateColumns="350px 1fr" h="calc(100vh - 73px)">
+      <Grid templateColumns="350px 1fr" h="100vh">
         {/* Sidebar */}
         <GridItem
           bg="gray.50"
@@ -408,6 +400,11 @@ export default function Page() {
           overflowY="auto"
         >
           <VStack gap={4} align="stretch">
+            {/* Connect Button */}
+            <Box>
+              <ConnectButton />
+            </Box>
+
             <HStack justify="space-between" align="center">
               <Heading size="md">Configuration</Heading>
               <Button
