@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ConnectButton } from './components/ConnectButton';
 import FunctionCard from './components/FunctionCard';
 import SetupModal from './components/SetupModal';
@@ -341,6 +341,26 @@ export default function Page() {
   };
 
   const [searchTerm, setSearchTerm] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Escape to clear search
+      if (e.key === 'Escape' && searchTerm) {
+        setSearchTerm('');
+        searchInputRef.current?.blur();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [searchTerm]);
 
   const networkNames = Object.keys(deploymentsFile);
   const deploymentNames = selectedNetwork
@@ -688,8 +708,14 @@ export default function Page() {
             {contractAbi && contractAddress && allFunctions.length > 0 && (
               <Box mb={6}>
                 <Field.Root>
-                  <Field.Label fontWeight="semibold">Search Functions</Field.Label>
+                  <Field.Label fontWeight="semibold">
+                    Search Functions
+                    <Text as="span" ml={2} fontSize="xs" color="gray.500" fontWeight="normal">
+                      (Ctrl+K or Cmd+K to focus)
+                    </Text>
+                  </Field.Label>
                   <Input
+                    ref={searchInputRef}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search by function name..."

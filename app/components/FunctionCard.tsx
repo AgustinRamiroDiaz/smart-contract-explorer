@@ -86,6 +86,13 @@ export default function FunctionCard({
     setArgs(prev => ({ ...prev, [paramName]: value }));
   };
 
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      callFunction();
+    }
+  };
+
   // Convert args to array in correct order
   const getArgsArray = () => {
     return func.inputs.map(input => {
@@ -201,16 +208,34 @@ export default function FunctionCard({
     }
   };
 
+  const handleToggle = () => setIsExpanded(!isExpanded);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleToggle();
+    }
+  };
+
   return (
     <Box borderWidth="1px" borderRadius="lg" overflow="hidden" mb={4}>
       {/* Header */}
       <HStack
-        onClick={() => setIsExpanded(!isExpanded)}
+        as="button"
+        onClick={handleToggle}
+        onKeyDown={handleKeyDown}
         p={4}
         bg="gray.50"
         cursor="pointer"
         userSelect="none"
         _hover={{ bg: 'gray.100' }}
+        _focus={{ outline: '2px solid', outlineColor: 'blue.500', outlineOffset: '-2px' }}
+        width="full"
+        textAlign="left"
+        transition="all 0.2s"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${func.name} function - ${func.stateMutability}`}
       >
         <Text fontSize="xl">{isExpanded ? '▼' : '▶'}</Text>
         <Text fontWeight="bold" fontFamily="mono" flex={1}>
@@ -256,6 +281,7 @@ export default function FunctionCard({
                   <Input
                     value={args[input.name] || ''}
                     onChange={(e) => handleArgChange(input.name, e.target.value)}
+                    onKeyDown={handleInputKeyDown}
                     placeholder={`Enter ${input.type}`}
                     fontFamily="mono"
                     fontSize="sm"

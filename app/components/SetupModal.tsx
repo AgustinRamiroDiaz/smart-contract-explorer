@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -91,6 +91,24 @@ export default function SetupModal({
   };
 
   const canComplete = (fileHandle || hasDeploymentsFile) && (folderHandle || hasFolderHandle);
+
+  // Add keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) {
+        onSkip();
+      }
+      // Enter to submit when canComplete
+      if (e.key === 'Enter' && canComplete && open) {
+        handleComplete();
+      }
+    };
+
+    if (open) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [open, onSkip, canComplete]);
 
   return (
     <DialogRoot open={open} size="lg">
