@@ -24,6 +24,7 @@ import {
   Button,
   IconButton,
 } from '@chakra-ui/react';
+import { Tooltip } from '@chakra-ui/react';
 import {
   saveFolderHandle,
   getFolderHandle,
@@ -439,7 +440,54 @@ export default function Page() {
             {!isInitializing && (
               <>
                 <Field.Root>
-                  <Field.Label fontSize="sm" fontWeight="semibold">Deployments File:</Field.Label>
+                  <Field.Label fontSize="sm" fontWeight="semibold">
+                    <HStack gap={1} display="inline-flex" align="center">
+                      <Text>Deployments File:</Text>
+                      <Tooltip.Root openDelay={200} closeDelay={100}>
+                        <Tooltip.Trigger asChild>
+                          <Box
+                            as="span"
+                            cursor="help"
+                            color="gray.500"
+                            fontSize="xs"
+                            display="inline-flex"
+                            alignItems="center"
+                          >
+                            ℹ️
+                          </Box>
+                        </Tooltip.Trigger>
+                        <Tooltip.Positioner>
+                          <Tooltip.Content
+                            bg="gray.800"
+                            color="white"
+                            p={3}
+                            borderRadius="md"
+                            maxW="320px"
+                            boxShadow="lg"
+                            zIndex={9999}
+                          >
+                            <Text fontWeight="semibold" mb={2} fontSize="sm">Expected JSON format:</Text>
+                            <Box
+                              as="pre"
+                              fontSize="xs"
+                              whiteSpace="pre-wrap"
+                              bg="gray.900"
+                              p={2}
+                              borderRadius="sm"
+                            >
+{`{
+  "network-name": {
+    "deployment-name": {
+      "ContractName": "0x..."
+    }
+  }
+}`}
+                            </Box>
+                          </Tooltip.Content>
+                        </Tooltip.Positioner>
+                      </Tooltip.Root>
+                    </HStack>
+                  </Field.Label>
                   <Button
                     onClick={handleSelectDeploymentsFile}
                     size="sm"
@@ -456,7 +504,57 @@ export default function Page() {
                 </Field.Root>
 
                 <Field.Root>
-                  <Field.Label fontSize="sm" fontWeight="semibold">ABIs Folder:</Field.Label>
+                  <Field.Label fontSize="sm" fontWeight="semibold">
+                    <HStack gap={1} display="inline-flex" align="center">
+                      <Text>ABIs Folder:</Text>
+                      <Tooltip.Root openDelay={200} closeDelay={100}>
+                        <Tooltip.Trigger asChild>
+                          <Box
+                            as="span"
+                            cursor="help"
+                            color="gray.500"
+                            fontSize="xs"
+                            display="inline-flex"
+                            alignItems="center"
+                          >
+                            ℹ️
+                          </Box>
+                        </Tooltip.Trigger>
+                        <Tooltip.Positioner>
+                          <Tooltip.Content
+                            bg="gray.800"
+                            color="white"
+                            p={3}
+                            borderRadius="md"
+                            maxW="320px"
+                            boxShadow="lg"
+                            zIndex={9999}
+                          >
+                            <Text fontWeight="semibold" mb={2} fontSize="sm">Expected folder structure:</Text>
+                            <Box
+                              as="pre"
+                              fontSize="xs"
+                              whiteSpace="pre-wrap"
+                              bg="gray.900"
+                              p={2}
+                              borderRadius="sm"
+                              mb={2}
+                            >
+{`artifacts/
+├── Contract1.sol/
+│   └── Contract1.json
+├── Contract2.sol/
+│   └── Contract2.json
+└── ...`}
+                            </Box>
+                            <Text fontSize="xs">
+                              Each .sol directory should contain a JSON file with the contract's ABI.
+                            </Text>
+                          </Tooltip.Content>
+                        </Tooltip.Positioner>
+                      </Tooltip.Root>
+                    </HStack>
+                  </Field.Label>
                   <Button
                     onClick={handleSelectAbisFolder}
                     size="sm"

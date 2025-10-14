@@ -6,11 +6,12 @@ import {
   Button,
   VStack,
   Text,
-  Input,
   Field,
   Heading,
+  HStack,
 } from '@chakra-ui/react';
 import { DialogRoot, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter, DialogBackdrop } from '@chakra-ui/react';
+import { Tooltip } from '@chakra-ui/react';
 
 interface SetupModalProps {
   open: boolean;
@@ -112,12 +113,61 @@ export default function SetupModal({
             <Box>
               <Field.Root>
                 <Field.Label fontWeight="semibold">
-                  1. Select Deployments File
-                  {hasDeploymentsFile && (
-                    <Text as="span" ml={2} fontSize="sm" color="green.600">
-                      ✓ Already configured
-                    </Text>
-                  )}
+                  <HStack gap={2} display="inline-flex" align="center">
+                    <Text>1. Select Deployments File</Text>
+                    <Tooltip.Root openDelay={200} closeDelay={100}>
+                      <Tooltip.Trigger asChild>
+                        <Box
+                          as="span"
+                          cursor="help"
+                          color="gray.500"
+                          fontSize="xs"
+                          display="inline-flex"
+                          alignItems="center"
+                        >
+                          ℹ️
+                        </Box>
+                      </Tooltip.Trigger>
+                      <Tooltip.Positioner>
+                        <Tooltip.Content
+                          bg="gray.800"
+                          color="white"
+                          p={3}
+                          borderRadius="md"
+                          maxW="320px"
+                          boxShadow="lg"
+                          zIndex={9999}
+                        >
+                          <Text fontWeight="semibold" mb={2} fontSize="sm">Expected JSON format:</Text>
+                          <Box
+                            as="pre"
+                            fontSize="xs"
+                            whiteSpace="pre-wrap"
+                            bg="gray.900"
+                            p={2}
+                            borderRadius="sm"
+                            mb={2}
+                          >
+{`{
+  "network-name": {
+    "deployment-name": {
+      "ContractName": "0x..."
+    }
+  }
+}`}
+                          </Box>
+                          <Text fontSize="xs">
+                            Example: Hardhat deployments file or custom JSON with contract addresses
+                          </Text>
+                        </Tooltip.Content>
+                      </Tooltip.Positioner>
+                    </Tooltip.Root>
+                    {hasDeploymentsFile && (
+                      <Text as="span" fontSize="sm" color="green.600">
+                        ✓ Already configured
+                      </Text>
+                    )}
+                  </HStack>
                 </Field.Label>
                 <Button
                   onClick={handleSelectFile}
@@ -149,12 +199,60 @@ export default function SetupModal({
             <Box>
               <Field.Root>
                 <Field.Label fontWeight="semibold">
-                  2. Select ABIs Folder
-                  {hasFolderHandle && (
-                    <Text as="span" ml={2} fontSize="sm" color="green.600">
-                      ✓ Already configured
-                    </Text>
-                  )}
+                  <HStack gap={2} display="inline-flex" align="center">
+                    <Text>2. Select ABIs Folder</Text>
+                    <Tooltip.Root openDelay={200} closeDelay={100}>
+                      <Tooltip.Trigger asChild>
+                        <Box
+                          as="span"
+                          cursor="help"
+                          color="gray.500"
+                          fontSize="xs"
+                          display="inline-flex"
+                          alignItems="center"
+                        >
+                          ℹ️
+                        </Box>
+                      </Tooltip.Trigger>
+                      <Tooltip.Positioner>
+                        <Tooltip.Content
+                          bg="gray.800"
+                          color="white"
+                          p={3}
+                          borderRadius="md"
+                          maxW="320px"
+                          boxShadow="lg"
+                          zIndex={9999}
+                        >
+                          <Text fontWeight="semibold" mb={2} fontSize="sm">Expected folder structure:</Text>
+                          <Box
+                            as="pre"
+                            fontSize="xs"
+                            whiteSpace="pre-wrap"
+                            bg="gray.900"
+                            p={2}
+                            borderRadius="sm"
+                            mb={2}
+                          >
+{`artifacts/
+├── Contract1.sol/
+│   └── Contract1.json
+├── Contract2.sol/
+│   └── Contract2.json
+└── ...`}
+                          </Box>
+                          <Text fontSize="xs">
+                            Compatible with Hardhat artifacts or Foundry out/ directory structure
+                          </Text>
+                        </Tooltip.Content>
+                      </Tooltip.Positioner>
+                    </Tooltip.Root>
+                    {hasFolderHandle && (
+                      <Text as="span" fontSize="sm" color="green.600">
+                        ✓ Already configured
+                      </Text>
+                    )}
+                  </HStack>
                 </Field.Label>
                 <Button
                   onClick={handleSelectFolder}
