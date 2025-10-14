@@ -94,8 +94,26 @@ export default function SetupModal({
 
   return (
     <DialogRoot open={open} size="lg">
-      <DialogBackdrop />
-      <DialogContent>
+      <DialogBackdrop
+        position="fixed"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        bg="blackAlpha.600"
+        zIndex={1000}
+      />
+      <DialogContent
+        position="fixed"
+        top="50%"
+        left="50%"
+        transform="translate(-50%, -50%)"
+        zIndex={1001}
+        bg="white"
+        maxW="lg"
+        w="full"
+        mx={4}
+      >
         <DialogHeader>
           <DialogTitle>
             <Heading size="lg">Welcome to GenLayer Explorer</Heading>
