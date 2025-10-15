@@ -340,6 +340,9 @@ export default function FunctionCard({
         <Button
           onClick={(e) => {
             e.stopPropagation();
+            if (!isExpanded) {
+              setIsExpanded(true);
+            }
             callFunction();
           }}
           loading={isReadFunction ? loading : (isWritePending || isConfirming)}
