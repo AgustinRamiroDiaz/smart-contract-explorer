@@ -87,6 +87,28 @@ export default function FunctionCard({
 
   const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
 
+  // Check if all required inputs are filled and valid
+  const isFormReady = (): boolean => {
+    // If no inputs, form is ready
+    if (func.inputs.length === 0) {
+      return true;
+    }
+
+    // Check if all inputs have values
+    const allInputsFilled = func.inputs.every(input => {
+      const value = args[input.name];
+      return value && value.trim() !== '';
+    });
+
+    if (!allInputsFilled) {
+      return false;
+    }
+
+    // Check if there are any validation errors
+    const hasValidationErrors = Object.keys(validationErrors).length > 0;
+    return !hasValidationErrors;
+  };
+
   // Validate all inputs and mark them as touched
   const validateAllInputs = (): boolean => {
     let hasErrors = false;
@@ -293,23 +315,47 @@ export default function FunctionCard({
     <Box layerStyle="card" mb={4}>
       {/* Header */}
       <HStack
-        as="button"
-        onClick={handleToggle}
-        onKeyDown={handleKeyDown}
         layerStyle="collapsibleHeader"
         width="full"
-        textAlign="left"
-        tabIndex={0}
-        aria-expanded={isExpanded}
-        aria-label={`${func.name} function - ${func.stateMutability}`}
+        gap={2}
       >
-        <Text fontSize="xl">{isExpanded ? '▼' : '▶'}</Text>
-        <Text fontWeight="bold" fontFamily="mono" flex={1}>
-          {func.name}
-        </Text>
-        <Badge colorScheme={getStateMutabilityColorScheme()} textTransform="uppercase">
-          {func.stateMutability}
-        </Badge>
+        <HStack
+          as="button"
+          onClick={handleToggle}
+          onKeyDown={handleKeyDown}
+          flex={1}
+          textAlign="left"
+          tabIndex={0}
+          aria-expanded={isExpanded}
+          aria-label={`${func.name} function - ${func.stateMutability}`}
+        >
+          <Text fontSize="xl">{isExpanded ? '▼' : '▶'}</Text>
+          <Text fontWeight="bold" fontFamily="mono" flex={1}>
+            {func.name}
+          </Text>
+          <Badge colorScheme={getStateMutabilityColorScheme()} textTransform="uppercase">
+            {func.stateMutability}
+          </Badge>
+        </HStack>
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            callFunction();
+          }}
+          loading={isReadFunction ? loading : (isWritePending || isConfirming)}
+          loadingText={
+            isReadFunction
+              ? "Calling..."
+              : isWritePending
+              ? "Sending..."
+              : "Confirming..."
+          }
+          colorScheme={getStateMutabilityColorScheme()}
+          size="sm"
+          disabled={!isFormReady() || (!isReadFunction && !isConnected)}
+        >
+          {isReadFunction ? 'Execute' : 'Send'}
+        </Button>
       </HStack>
 
       {/* Expandable Content */}
@@ -370,25 +416,6 @@ export default function FunctionCard({
               })}
             </VStack>
           )}
-
-          {/* Call Button */}
-          <Button
-            onClick={callFunction}
-            loading={isReadFunction ? loading : (isWritePending || isConfirming)}
-            loadingText={
-              isReadFunction
-                ? "Calling..."
-                : isWritePending
-                ? "Sending transaction..."
-                : "Confirming..."
-            }
-            colorScheme={getStateMutabilityColorScheme()}
-            width="full"
-            mb={error || result !== null || hash ? 4 : 0}
-            disabled={!isReadFunction && !isConnected}
-          >
-            {isReadFunction ? 'Execute' : isConnected ? 'Send Transaction' : 'Connect Wallet to Execute'}
-          </Button>
 
           {/* Write Function Status */}
           {!isReadFunction && hash && (
