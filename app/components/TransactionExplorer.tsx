@@ -97,7 +97,16 @@ export default function TransactionExplorer({
             abi: contractAbi,
             data: transaction.input,
           });
-          setDecodedInput(decoded);
+
+          // Find the matching function in the ABI to get full signature
+          const matchingFunction = contractAbi.find(
+            (item: any) => item.type === 'function' && item.name === decoded.functionName
+          );
+
+          setDecodedInput({
+            ...decoded,
+            signature: matchingFunction ? `${matchingFunction.name}(${matchingFunction.inputs.map((input: any) => `${input.type} ${input.name}`).join(', ')})` : decoded.functionName
+          });
         } catch (err) {
           console.error('Failed to decode input:', err);
           setDecodedInput({ error: 'Failed to decode input data. The ABI might not match this transaction.' });
@@ -295,9 +304,16 @@ export default function TransactionExplorer({
               ) : (
                 <VStack gap={3} align="stretch">
                   <Box>
-                    <Text fontSize="sm" fontWeight="semibold" color="gray.600">Function Name:</Text>
-                    <Code display="block" p={2} fontSize="sm">
-                      {decodedInput.functionName}
+                    <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb={2}>Function Signature:</Text>
+                    <Code
+                      display="block"
+                      p={3}
+                      fontSize="sm"
+                      whiteSpace="pre-wrap"
+                      wordBreak="break-word"
+                      bg="gray.50"
+                    >
+                      {decodedInput.signature || decodedInput.functionName}
                     </Code>
                   </Box>
                   {decodedInput.args && (
