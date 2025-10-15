@@ -218,21 +218,15 @@ export default function FunctionCard({
   };
 
   return (
-    <Box borderWidth="1px" borderRadius="lg" overflow="hidden" mb={4}>
+    <Box layerStyle="card" mb={4}>
       {/* Header */}
       <HStack
         as="button"
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
-        p={4}
-        bg="gray.50"
-        cursor="pointer"
-        userSelect="none"
-        _hover={{ bg: 'gray.100' }}
-        _focus={{ outline: '2px solid', outlineColor: 'blue.500', outlineOffset: '-2px' }}
+        layerStyle="collapsibleHeader"
         width="full"
         textAlign="left"
-        transition="all 0.2s"
         tabIndex={0}
         aria-expanded={isExpanded}
         aria-label={`${func.name} function - ${func.stateMutability}`}
@@ -249,17 +243,9 @@ export default function FunctionCard({
       {/* Expandable Content */}
       <Collapsible.Root open={isExpanded}>
         <Collapsible.Content>
-        <Box p={4} bg="white">
+        <Box layerStyle="cardSection">
           {/* Function Signature */}
-          <Code
-            display="block"
-            p={2}
-            mb={4}
-            bg="gray.50"
-            borderRadius="md"
-            fontSize="sm"
-            whiteSpace="pre-wrap"
-          >
+          <Code layerStyle="codeBlock" mb={4}>
             {func.name}({func.inputs.map(i => `${i.type} ${i.name}`).join(', ')})
             {func.outputs.length > 0 && (
               <> → ({func.outputs.map(o => o.type).join(', ')})</>
@@ -272,9 +258,9 @@ export default function FunctionCard({
               <Text fontWeight="bold">Parameters:</Text>
               {func.inputs.map((input, idx) => (
                 <Field.Root key={idx}>
-                  <Field.Label fontSize="sm">
+                  <Field.Label textStyle="label">
                     <Text as="span" fontWeight="medium">{input.name}</Text>
-                    <Text as="span" ml={2} color="gray.600" fontFamily="mono" fontSize="xs">
+                    <Text as="span" ml={2} color="fg.muted" textStyle="monoCode">
                       ({input.type})
                     </Text>
                   </Field.Label>
@@ -283,8 +269,7 @@ export default function FunctionCard({
                     onChange={(e) => handleArgChange(input.name, e.target.value)}
                     onKeyDown={handleInputKeyDown}
                     placeholder={`Enter ${input.type}`}
-                    fontFamily="mono"
-                    fontSize="sm"
+                    textStyle="mono"
                   />
                 </Field.Root>
               ))}
@@ -318,13 +303,7 @@ export default function FunctionCard({
                 <Text fontWeight="bold" mb={1}>
                   {isConfirming ? 'Transaction Pending' : isConfirmed ? 'Transaction Confirmed' : 'Transaction Sent'}
                 </Text>
-                <Code
-                  display="block"
-                  p={2}
-                  fontSize="xs"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-all"
-                >
+                <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
                   {hash}
                 </Code>
               </Box>
@@ -335,7 +314,7 @@ export default function FunctionCard({
           {error && (
             <Alert.Root status="error" borderRadius="md" mb={4}>
               <Alert.Indicator />
-              <Alert.Title fontSize="sm">{error}</Alert.Title>
+              <Alert.Title textStyle="label">{error}</Alert.Title>
             </Alert.Root>
           )}
 
@@ -344,14 +323,7 @@ export default function FunctionCard({
             <Alert.Root status="success" borderRadius="md">
               <Box width="full">
                 <Text fontWeight="bold" mb={2}>Result:</Text>
-                <Box
-                  p={2}
-                  bg="gray.50"
-                  borderRadius="md"
-                  fontSize="sm"
-                  width="full"
-                  overflowX="auto"
-                >
+                <Box layerStyle="codeBlock" width="full" overflowX="auto">
                   {typeof result === 'object' ? (
                     <JsonEditor
                       data={serializeBigInts(result)}

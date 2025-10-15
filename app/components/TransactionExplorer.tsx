@@ -225,12 +225,11 @@ export default function TransactionExplorer({
             value={txHash}
             onChange={(e) => setTxHash(e.target.value)}
             placeholder="0x..."
-            fontFamily="mono"
-            fontSize="sm"
+            textStyle="mono"
           />
-          <Field.HelperText fontSize="xs">
+          <Field.HelperText textStyle="helperText">
             {loading ? (
-              <Text color="blue.600">Loading transaction...</Text>
+              <Text color="blue.solid">Loading transaction...</Text>
             ) : (
               'Paste a transaction hash (auto-fetches when complete)'
             )}
@@ -242,7 +241,7 @@ export default function TransactionExplorer({
       {error && (
         <Alert.Root status="error" borderRadius="md">
           <Alert.Indicator />
-          <Alert.Title fontSize="sm">{error}</Alert.Title>
+          <Alert.Title textStyle="label">{error}</Alert.Title>
         </Alert.Root>
       )}
 
@@ -250,199 +249,200 @@ export default function TransactionExplorer({
       {transactionData && (
         <VStack gap={6} align="stretch">
           {/* Basic Transaction Info */}
-          <Box borderWidth="1px" borderRadius="lg" p={4}>
-            <Heading size="md" mb={4}>Transaction Details</Heading>
-            <VStack gap={3} align="stretch">
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.600">Block Number:</Text>
-                <Code display="block" p={2} fontSize="xs">
-                  {transactionData.blockNumber?.toString() || 'Pending'}
-                </Code>
-              </Box>
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.600">From:</Text>
-                <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
-                  {transactionData.from}
-                </Code>
-              </Box>
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.600">To:</Text>
-                <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
-                  {transactionData.to || 'Contract Creation'}
-                </Code>
-              </Box>
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.600">Value:</Text>
-                <Code display="block" p={2} fontSize="xs">
-                  {transactionData.value.toString()} wei
-                </Code>
-              </Box>
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.600">Gas Used:</Text>
-                <Code display="block" p={2} fontSize="xs">
-                  {receiptData?.gasUsed?.toString() || 'N/A'}
-                </Code>
-              </Box>
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" color="gray.600">Status:</Text>
-                <Code display="block" p={2} fontSize="xs">
-                  {receiptData?.status === 'success' ? '✓ Success' : '✗ Failed'}
-                </Code>
-              </Box>
-            </VStack>
+          <Box layerStyle="card">
+            <Box layerStyle="cardSection">
+              <Heading size="md" mb={4}>Transaction Details</Heading>
+              <VStack gap={3} align="stretch">
+                <Box>
+                  <Text textStyle="cardHeading">Block Number:</Text>
+                  <Code layerStyle="codeInline" display="block">
+                    {transactionData.blockNumber?.toString() || 'Pending'}
+                  </Code>
+                </Box>
+                <Box>
+                  <Text textStyle="cardHeading">From:</Text>
+                  <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
+                    {transactionData.from}
+                  </Code>
+                </Box>
+                <Box>
+                  <Text textStyle="cardHeading">To:</Text>
+                  <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
+                    {transactionData.to || 'Contract Creation'}
+                  </Code>
+                </Box>
+                <Box>
+                  <Text textStyle="cardHeading">Value:</Text>
+                  <Code layerStyle="codeInline" display="block">
+                    {transactionData.value.toString()} wei
+                  </Code>
+                </Box>
+                <Box>
+                  <Text textStyle="cardHeading">Gas Used:</Text>
+                  <Code layerStyle="codeInline" display="block">
+                    {receiptData?.gasUsed?.toString() || 'N/A'}
+                  </Code>
+                </Box>
+                <Box>
+                  <Text textStyle="cardHeading">Status:</Text>
+                  <Code layerStyle="codeInline" display="block">
+                    {receiptData?.status === 'success' ? '✓ Success' : '✗ Failed'}
+                  </Code>
+                </Box>
+              </VStack>
+            </Box>
           </Box>
 
           {/* Decoded Input */}
           {decodedInput && (
-            <Box borderWidth="1px" borderRadius="lg" p={4}>
-              <Heading size="md" mb={4}>Decoded Input</Heading>
-              {decodedInput.error ? (
-                <Alert.Root status="warning" borderRadius="md">
-                  <Alert.Indicator />
-                  <Alert.Title fontSize="sm">{decodedInput.error}</Alert.Title>
-                </Alert.Root>
-              ) : (
-                <VStack gap={3} align="stretch">
-                  <Box>
-                    <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb={2}>Function Signature:</Text>
-                    <Code
-                      display="block"
-                      p={3}
-                      fontSize="sm"
-                      whiteSpace="pre-wrap"
-                      wordBreak="break-word"
-                      bg="gray.50"
-                    >
-                      {decodedInput.signature || decodedInput.functionName}
-                    </Code>
-                  </Box>
-                  {decodedInput.args && (
+            <Box layerStyle="card">
+              <Box layerStyle="cardSection">
+                <Heading size="md" mb={4}>Decoded Input</Heading>
+                {decodedInput.error ? (
+                  <Alert.Root status="warning" borderRadius="md">
+                    <Alert.Indicator />
+                    <Alert.Title textStyle="label">{decodedInput.error}</Alert.Title>
+                  </Alert.Root>
+                ) : (
+                  <VStack gap={3} align="stretch">
                     <Box>
-                      <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb={2}>Arguments:</Text>
-                      <Box bg="gray.50" p={3} borderRadius="md">
-                        <JsonEditor
-                          data={serializeBigInts(decodedInput.args)}
-                          setData={() => {}}
-                          rootName="args"
-                          restrictEdit={true}
-                          restrictDelete={true}
-                          restrictAdd={true}
-                        />
-                      </Box>
+                      <Text textStyle="cardHeading" mb={2}>Function Signature:</Text>
+                      <Code layerStyle="codeBlock">
+                        {decodedInput.signature || decodedInput.functionName}
+                      </Code>
                     </Box>
-                  )}
-                </VStack>
-              )}
+                    {decodedInput.args && (
+                      <Box>
+                        <Text textStyle="cardHeading" mb={2}>Arguments:</Text>
+                        <Box layerStyle="codeBlock">
+                          <JsonEditor
+                            data={serializeBigInts(decodedInput.args)}
+                            setData={() => {}}
+                            rootName="args"
+                            restrictEdit={true}
+                            restrictDelete={true}
+                            restrictAdd={true}
+                          />
+                        </Box>
+                      </Box>
+                    )}
+                  </VStack>
+                )}
+              </Box>
             </Box>
           )}
 
           {/* Decoded Events */}
           {decodedEvents.length > 0 && (
-            <Box borderWidth="1px" borderRadius="lg" p={4}>
-              <Heading size="md" mb={4}>Events ({decodedEvents.length})</Heading>
-              <VStack gap={4} align="stretch">
-                {decodedEvents.map((event) => {
-                  const isExpanded = expandedEvents[event.index] ?? event.decoded;
-                  return (
-                    <Box key={event.index} borderWidth="1px" borderRadius="lg" overflow="hidden">
-                      {/* Event Header */}
-                      <HStack
-                        as="button"
-                        onClick={() => toggleEvent(event.index)}
-                        onKeyDown={(e) => handleEventKeyDown(e, event.index)}
-                        p={3}
-                        bg="gray.50"
-                        cursor="pointer"
-                        userSelect="none"
-                        _hover={{ bg: 'gray.100' }}
-                        _focus={{ outline: '2px solid', outlineColor: 'blue.500', outlineOffset: '-2px' }}
-                        width="full"
-                        textAlign="left"
-                        transition="all 0.2s"
-                        tabIndex={0}
-                        aria-expanded={isExpanded}
-                        aria-label={`Event ${event.index + 1} - ${event.eventName || 'Raw Log'}`}
-                      >
-                        <Text fontSize="lg">{isExpanded ? '▼' : '▶'}</Text>
-                        <VStack align="start" flex={1} gap={1}>
-                          <HStack>
-                            <Text fontWeight="bold" fontFamily="mono" fontSize="sm">
-                              Event #{event.index + 1}
-                              {event.eventName && `: ${event.eventName}`}
-                            </Text>
-                          </HStack>
-                        </VStack>
-                        {event.decoded && (
-                          <Text fontSize="xs" color="green.600" fontWeight="semibold">✓ Decoded</Text>
-                        )}
-                        {!event.decoded && (
-                          <Text fontSize="xs" color="orange.600" fontWeight="semibold">⚠ Raw Log</Text>
-                        )}
-                      </HStack>
+            <Box layerStyle="card">
+              <Box layerStyle="cardSection">
+                <Heading size="md" mb={4}>Events ({decodedEvents.length})</Heading>
+                <VStack gap={4} align="stretch">
+                  {decodedEvents.map((event) => {
+                    const isExpanded = expandedEvents[event.index] ?? event.decoded;
+                    return (
+                      <Box key={event.index} layerStyle="card">
+                        {/* Event Header */}
+                        <HStack
+                          as="button"
+                          onClick={() => toggleEvent(event.index)}
+                          onKeyDown={(e) => handleEventKeyDown(e, event.index)}
+                          p={3}
+                          bg="header.bg"
+                          cursor="pointer"
+                          userSelect="none"
+                          _hover={{ bg: 'header.hover' }}
+                          _focus={{ outline: '2px solid', outlineColor: 'blue.solid', outlineOffset: '-2px' }}
+                          width="full"
+                          textAlign="left"
+                          transition="all 0.2s"
+                          tabIndex={0}
+                          aria-expanded={isExpanded}
+                          aria-label={`Event ${event.index + 1} - ${event.eventName || 'Raw Log'}`}
+                        >
+                          <Text fontSize="lg">{isExpanded ? '▼' : '▶'}</Text>
+                          <VStack align="start" flex={1} gap={1}>
+                            <HStack>
+                              <Text fontWeight="bold" fontFamily="mono" fontSize="sm">
+                                Event #{event.index + 1}
+                                {event.eventName && `: ${event.eventName}`}
+                              </Text>
+                            </HStack>
+                          </VStack>
+                          {event.decoded && (
+                            <Text fontSize="xs" color="green.solid" fontWeight="semibold">✓ Decoded</Text>
+                          )}
+                          {!event.decoded && (
+                            <Text fontSize="xs" color="orange.solid" fontWeight="semibold">⚠ Raw Log</Text>
+                          )}
+                        </HStack>
 
-                      {/* Expandable Content */}
-                      <Collapsible.Root open={isExpanded}>
-                        <Collapsible.Content>
-                          <Box p={4} bg="white">
-                            <VStack gap={3} align="stretch">
-                              <Box>
-                                <Text fontSize="xs" fontWeight="semibold" color="gray.600">Address:</Text>
-                                <Code display="block" p={2} fontSize="xs" mt={1} whiteSpace="pre-wrap" wordBreak="break-all">
-                                  {event.address}
-                                </Code>
-                              </Box>
-
-                              {event.args && (
+                        {/* Expandable Content */}
+                        <Collapsible.Root open={isExpanded}>
+                          <Collapsible.Content>
+                            <Box layerStyle="cardSection">
+                              <VStack gap={3} align="stretch">
                                 <Box>
-                                  <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Arguments:</Text>
-                                  <Box bg="gray.50" p={2} borderRadius="md">
-                                    <JsonEditor
-                                      data={serializeBigInts(event.args)}
-                                      setData={() => {}}
-                                      rootName={`event_${event.index}`}
-                                      restrictEdit={true}
-                                      restrictDelete={true}
-                                      restrictAdd={true}
-                                    />
+                                  <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted">Address:</Text>
+                                  <Code layerStyle="codeInline" display="block" mt={1} whiteSpace="pre-wrap" wordBreak="break-all">
+                                    {event.address}
+                                  </Code>
+                                </Box>
+
+                                {event.args && (
+                                  <Box>
+                                    <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted" mb={1}>Arguments:</Text>
+                                    <Box layerStyle="codeBlock">
+                                      <JsonEditor
+                                        data={serializeBigInts(event.args)}
+                                        setData={() => {}}
+                                        rootName={`event_${event.index}`}
+                                        restrictEdit={true}
+                                        restrictDelete={true}
+                                        restrictAdd={true}
+                                      />
+                                    </Box>
                                   </Box>
-                                </Box>
-                              )}
+                                )}
 
-                              {!event.decoded && event.topics && (
-                                <Box>
-                                  <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Raw Topics:</Text>
-                                  <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
-                                    {JSON.stringify(event.topics, null, 2)}
-                                  </Code>
-                                </Box>
-                              )}
+                                {!event.decoded && event.topics && (
+                                  <Box>
+                                    <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted" mb={1}>Raw Topics:</Text>
+                                    <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
+                                      {JSON.stringify(event.topics, null, 2)}
+                                    </Code>
+                                  </Box>
+                                )}
 
-                              {!event.decoded && event.data && (
-                                <Box>
-                                  <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Raw Data:</Text>
-                                  <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
-                                    {event.data}
-                                  </Code>
-                                </Box>
-                              )}
-                            </VStack>
-                          </Box>
-                        </Collapsible.Content>
-                      </Collapsible.Root>
-                    </Box>
-                  );
-                })}
-              </VStack>
+                                {!event.decoded && event.data && (
+                                  <Box>
+                                    <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted" mb={1}>Raw Data:</Text>
+                                    <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
+                                      {event.data}
+                                    </Code>
+                                  </Box>
+                                )}
+                              </VStack>
+                            </Box>
+                          </Collapsible.Content>
+                        </Collapsible.Root>
+                      </Box>
+                    );
+                  })}
+                </VStack>
+              </Box>
             </Box>
           )}
 
           {/* No Events */}
           {receiptData && decodedEvents.length === 0 && (
-            <Box borderWidth="1px" borderRadius="lg" p={4}>
-              <Heading size="md" mb={2}>Events</Heading>
-              <Text fontSize="sm" color="gray.600">
-                No events were emitted in this transaction
-              </Text>
+            <Box layerStyle="card">
+              <Box layerStyle="cardSection">
+                <Heading size="md" mb={2}>Events</Heading>
+                <Text fontSize="sm" color="fg.muted">
+                  No events were emitted in this transaction
+                </Text>
+              </Box>
             </Box>
           )}
         </VStack>
@@ -452,10 +452,10 @@ export default function TransactionExplorer({
       {!loading && !transactionData && !error && (
         <Center py={12}>
           <VStack gap={2}>
-            <Text color="gray.500" fontSize="lg">
+            <Text color="fg.muted" fontSize="lg">
               Enter a transaction hash to explore
             </Text>
-            <Text color="gray.400" fontSize="sm">
+            <Text color="fg.subtle" fontSize="sm">
               The transaction will be decoded using the selected ABI from the sidebar
             </Text>
           </VStack>

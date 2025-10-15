@@ -140,7 +140,7 @@ export default function SetupModal({
 
         <DialogBody>
           <VStack gap={6} align="stretch">
-            <Text color="gray.600">
+            <Text color="fg.muted">
               To get started, please configure your deployment file and ABIs folder.
               This only needs to be done once - your configuration will be saved.
             </Text>
@@ -156,7 +156,7 @@ export default function SetupModal({
                         <Box
                           as="span"
                           cursor="help"
-                          color="gray.500"
+                          color="fg.subtle"
                           fontSize="xs"
                           display="inline-flex"
                           alignItems="center"
@@ -166,8 +166,8 @@ export default function SetupModal({
                       </Tooltip.Trigger>
                       <Tooltip.Positioner>
                         <Tooltip.Content
-                          bg="gray.800"
-                          color="white"
+                          bg="bg.inverted"
+                          color="fg.inverted"
                           p={3}
                           borderRadius="md"
                           maxW="320px"
@@ -199,7 +199,7 @@ export default function SetupModal({
                       </Tooltip.Positioner>
                     </Tooltip.Root>
                     {hasDeploymentsFile && (
-                      <Text as="span" fontSize="sm" color="green.600">
+                      <Text as="span" fontSize="sm" color="green.solid">
                         ✓ Already configured
                       </Text>
                     )}
@@ -219,12 +219,12 @@ export default function SetupModal({
                     : 'Select Deployments File'}
                 </Button>
                 {fileHandle && (
-                  <Text fontSize="xs" color="green.600" mt={1}>
+                  <Text textStyle="helperText" color="green.solid" mt={1}>
                     ✓ File selected: {fileHandle.name}
                   </Text>
                 )}
                 {hasDeploymentsFile && !fileHandle && (
-                  <Text fontSize="xs" color="gray.600" mt={1}>
+                  <Text textStyle="helperText" mt={1}>
                     Using existing deployments file (select a new one to replace)
                   </Text>
                 )}
@@ -242,7 +242,7 @@ export default function SetupModal({
                         <Box
                           as="span"
                           cursor="help"
-                          color="gray.500"
+                          color="fg.subtle"
                           fontSize="xs"
                           display="inline-flex"
                           alignItems="center"
@@ -252,8 +252,8 @@ export default function SetupModal({
                       </Tooltip.Trigger>
                       <Tooltip.Positioner>
                         <Tooltip.Content
-                          bg="gray.800"
-                          color="white"
+                          bg="bg.inverted"
+                          color="fg.inverted"
                           p={3}
                           borderRadius="md"
                           maxW="320px"
@@ -284,7 +284,7 @@ export default function SetupModal({
                       </Tooltip.Positioner>
                     </Tooltip.Root>
                     {hasFolderHandle && (
-                      <Text as="span" fontSize="sm" color="green.600">
+                      <Text as="span" fontSize="sm" color="green.solid">
                         ✓ Already configured
                       </Text>
                     )}
@@ -304,12 +304,12 @@ export default function SetupModal({
                     : 'Select ABIs Folder'}
                 </Button>
                 {folderHandle && (
-                  <Text fontSize="xs" color="green.600" mt={1}>
+                  <Text textStyle="helperText" color="green.solid" mt={1}>
                     ✓ Folder selected: {folderHandle.name}
                   </Text>
                 )}
                 {hasFolderHandle && !folderHandle && (
-                  <Text fontSize="xs" color="gray.600" mt={1}>
+                  <Text textStyle="helperText" mt={1}>
                     Using existing folder (select a new one to replace)
                   </Text>
                 )}
@@ -318,16 +318,16 @@ export default function SetupModal({
 
             {/* Error Message */}
             {error && (
-              <Box p={3} bg="red.50" borderRadius="md" borderWidth="1px" borderColor="red.200">
-                <Text fontSize="sm" color="red.700">
+              <Box p={3} bg="red.subtle" borderRadius="md" borderWidth="1px" borderColor="red.muted">
+                <Text textStyle="label" color="red.fg">
                   {error}
                 </Text>
               </Box>
             )}
 
             {/* Info */}
-            <Box p={3} bg="blue.50" borderRadius="md">
-              <Text fontSize="sm" color="blue.900">
+            <Box p={3} bg="blue.subtle" borderRadius="md">
+              <Text textStyle="label" color="blue.fg">
                 💡 Your configuration will be saved in your browser. You can reconfigure
                 anytime using the settings button in the sidebar.
               </Text>
