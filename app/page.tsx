@@ -837,9 +837,8 @@ export default function Page() {
 
               {/* Transaction Explorer Tab */}
               <Tabs.Content value="transactions">
-                {contractAbi && contractAddress ? (
+                {contractAbi ? (
                   <TransactionExplorer
-                    contractAddress={contractAddress}
                     contractAbi={contractAbi}
                     chain={genlayerTestnet}
                   />

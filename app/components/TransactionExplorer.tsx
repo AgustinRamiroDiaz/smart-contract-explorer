@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { createPublicClient, http, decodeAbiParameters, decodeFunctionData, decodeEventLog } from 'viem';
+import { useState, useEffect } from 'react';
+import { createPublicClient, http, decodeFunctionData, decodeEventLog } from 'viem';
 import {
   Box,
-  Button,
   Text,
   Input,
   Field,
@@ -13,14 +12,13 @@ import {
   Code,
   Alert,
   Heading,
-  Spinner,
   Center,
+  Collapsible,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
 
 interface TransactionExplorerProps {
-  contractAddress: string;
   contractAbi: any[];
   chain: any;
 }
@@ -42,7 +40,6 @@ function serializeBigInts(obj: any): any {
 }
 
 export default function TransactionExplorer({
-  contractAddress,
   contractAbi,
   chain
 }: TransactionExplorerProps) {
@@ -53,6 +50,8 @@ export default function TransactionExplorer({
   const [receiptData, setReceiptData] = useState<any>(null);
   const [decodedInput, setDecodedInput] = useState<any>(null);
   const [decodedEvents, setDecodedEvents] = useState<any[]>([]);
+  const [lastFetchedHash, setLastFetchedHash] = useState<string>('');
+  const [expandedEvents, setExpandedEvents] = useState<Record<number, boolean>>({});
 
   const handleExplore = async () => {
     if (!txHash || !txHash.startsWith('0x')) {
@@ -107,7 +106,7 @@ export default function TransactionExplorer({
 
       // Decode events/logs
       if (receipt.logs && receipt.logs.length > 0) {
-        const decodedLogs = receipt.logs.map((log, index) => {
+        const decodedLogs = receipt.logs.map((log: any, index: number) => {
           try {
             // Try to decode each log with the ABI
             const topics = log.topics;
@@ -155,8 +154,16 @@ export default function TransactionExplorer({
         });
 
         setDecodedEvents(decodedLogs);
+
+        // Set initial expanded state: decoded events are expanded, raw logs are collapsed
+        const initialExpandedState: Record<number, boolean> = {};
+        decodedLogs.forEach((event) => {
+          initialExpandedState[event.index] = event.decoded;
+        });
+        setExpandedEvents(initialExpandedState);
       }
 
+      setLastFetchedHash(txHash);
       toaster.success({
         title: 'Transaction loaded',
         description: 'Transaction details fetched successfully',
@@ -173,10 +180,27 @@ export default function TransactionExplorer({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
+  // Auto-fetch when a complete transaction hash is entered
+  useEffect(() => {
+    const isValidHash = txHash.startsWith('0x') && txHash.length === 66;
+    const hasChanged = txHash !== lastFetchedHash;
+
+    if (isValidHash && hasChanged && !loading) {
       handleExplore();
+    }
+  }, [txHash]);
+
+  const toggleEvent = (index: number) => {
+    setExpandedEvents(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const handleEventKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleEvent(index);
     }
   };
 
@@ -188,27 +212,19 @@ export default function TransactionExplorer({
           <Field.Label fontSize="lg" fontWeight="semibold">
             Transaction Hash
           </Field.Label>
-          <HStack>
-            <Input
-              value={txHash}
-              onChange={(e) => setTxHash(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="0x..."
-              fontFamily="mono"
-              fontSize="sm"
-            />
-            <Button
-              onClick={handleExplore}
-              loading={loading}
-              loadingText="Loading..."
-              colorScheme="blue"
-              minW="120px"
-            >
-              Explore
-            </Button>
-          </HStack>
+          <Input
+            value={txHash}
+            onChange={(e) => setTxHash(e.target.value)}
+            placeholder="0x..."
+            fontFamily="mono"
+            fontSize="sm"
+          />
           <Field.HelperText fontSize="xs">
-            Enter a transaction hash to decode its input and events using the selected ABI
+            {loading ? (
+              <Text color="blue.600">Loading transaction...</Text>
+            ) : (
+              'Paste a transaction hash (auto-fetches when complete)'
+            )}
           </Field.HelperText>
         </Field.Root>
       </Box>
@@ -228,6 +244,12 @@ export default function TransactionExplorer({
           <Box borderWidth="1px" borderRadius="lg" p={4}>
             <Heading size="md" mb={4}>Transaction Details</Heading>
             <VStack gap={3} align="stretch">
+              <Box>
+                <Text fontSize="sm" fontWeight="semibold" color="gray.600">Block Number:</Text>
+                <Code display="block" p={2} fontSize="xs">
+                  {transactionData.blockNumber?.toString() || 'Pending'}
+                </Code>
+              </Box>
               <Box>
                 <Text fontSize="sm" fontWeight="semibold" color="gray.600">From:</Text>
                 <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
@@ -303,69 +325,97 @@ export default function TransactionExplorer({
             <Box borderWidth="1px" borderRadius="lg" p={4}>
               <Heading size="md" mb={4}>Events ({decodedEvents.length})</Heading>
               <VStack gap={4} align="stretch">
-                {decodedEvents.map((event, idx) => (
-                  <Box key={idx} borderWidth="1px" borderRadius="md" p={3} bg="gray.50">
-                    <HStack mb={2}>
-                      <Text fontSize="sm" fontWeight="semibold">Event #{idx + 1}</Text>
-                      {event.decoded && (
-                        <Text fontSize="xs" color="green.600" fontWeight="semibold">✓ Decoded</Text>
-                      )}
-                      {!event.decoded && (
-                        <Text fontSize="xs" color="orange.600" fontWeight="semibold">⚠ Raw Log</Text>
-                      )}
-                    </HStack>
+                {decodedEvents.map((event) => {
+                  const isExpanded = expandedEvents[event.index] ?? event.decoded;
+                  return (
+                    <Box key={event.index} borderWidth="1px" borderRadius="lg" overflow="hidden">
+                      {/* Event Header */}
+                      <HStack
+                        as="button"
+                        onClick={() => toggleEvent(event.index)}
+                        onKeyDown={(e) => handleEventKeyDown(e, event.index)}
+                        p={3}
+                        bg="gray.50"
+                        cursor="pointer"
+                        userSelect="none"
+                        _hover={{ bg: 'gray.100' }}
+                        _focus={{ outline: '2px solid', outlineColor: 'blue.500', outlineOffset: '-2px' }}
+                        width="full"
+                        textAlign="left"
+                        transition="all 0.2s"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        aria-label={`Event ${event.index + 1} - ${event.eventName || 'Raw Log'}`}
+                      >
+                        <Text fontSize="lg">{isExpanded ? '▼' : '▶'}</Text>
+                        <VStack align="start" flex={1} gap={1}>
+                          <HStack>
+                            <Text fontWeight="bold" fontFamily="mono" fontSize="sm">
+                              Event #{event.index + 1}
+                              {event.eventName && `: ${event.eventName}`}
+                            </Text>
+                          </HStack>
+                        </VStack>
+                        {event.decoded && (
+                          <Text fontSize="xs" color="green.600" fontWeight="semibold">✓ Decoded</Text>
+                        )}
+                        {!event.decoded && (
+                          <Text fontSize="xs" color="orange.600" fontWeight="semibold">⚠ Raw Log</Text>
+                        )}
+                      </HStack>
 
-                    {event.eventName && (
-                      <Box mb={2}>
-                        <Text fontSize="xs" fontWeight="semibold" color="gray.600">Event Name:</Text>
-                        <Code display="block" p={2} fontSize="xs" mt={1}>
-                          {event.eventName}
-                        </Code>
-                      </Box>
-                    )}
+                      {/* Expandable Content */}
+                      <Collapsible.Root open={isExpanded}>
+                        <Collapsible.Content>
+                          <Box p={4} bg="white">
+                            <VStack gap={3} align="stretch">
+                              <Box>
+                                <Text fontSize="xs" fontWeight="semibold" color="gray.600">Address:</Text>
+                                <Code display="block" p={2} fontSize="xs" mt={1} whiteSpace="pre-wrap" wordBreak="break-all">
+                                  {event.address}
+                                </Code>
+                              </Box>
 
-                    <Box mb={2}>
-                      <Text fontSize="xs" fontWeight="semibold" color="gray.600">Address:</Text>
-                      <Code display="block" p={2} fontSize="xs" mt={1} whiteSpace="pre-wrap" wordBreak="break-all">
-                        {event.address}
-                      </Code>
+                              {event.args && (
+                                <Box>
+                                  <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Arguments:</Text>
+                                  <Box bg="gray.50" p={2} borderRadius="md">
+                                    <JsonEditor
+                                      data={serializeBigInts(event.args)}
+                                      setData={() => {}}
+                                      rootName={`event_${event.index}`}
+                                      restrictEdit={true}
+                                      restrictDelete={true}
+                                      restrictAdd={true}
+                                    />
+                                  </Box>
+                                </Box>
+                              )}
+
+                              {!event.decoded && event.topics && (
+                                <Box>
+                                  <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Raw Topics:</Text>
+                                  <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
+                                    {JSON.stringify(event.topics, null, 2)}
+                                  </Code>
+                                </Box>
+                              )}
+
+                              {!event.decoded && event.data && (
+                                <Box>
+                                  <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Raw Data:</Text>
+                                  <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
+                                    {event.data}
+                                  </Code>
+                                </Box>
+                              )}
+                            </VStack>
+                          </Box>
+                        </Collapsible.Content>
+                      </Collapsible.Root>
                     </Box>
-
-                    {event.args && (
-                      <Box>
-                        <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Arguments:</Text>
-                        <Box bg="white" p={2} borderRadius="md">
-                          <JsonEditor
-                            data={serializeBigInts(event.args)}
-                            setData={() => {}}
-                            rootName={`event_${idx}`}
-                            restrictEdit={true}
-                            restrictDelete={true}
-                            restrictAdd={true}
-                          />
-                        </Box>
-                      </Box>
-                    )}
-
-                    {!event.decoded && event.topics && (
-                      <Box>
-                        <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Raw Topics:</Text>
-                        <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
-                          {JSON.stringify(event.topics, null, 2)}
-                        </Code>
-                      </Box>
-                    )}
-
-                    {!event.decoded && event.data && (
-                      <Box mt={2}>
-                        <Text fontSize="xs" fontWeight="semibold" color="gray.600" mb={1}>Raw Data:</Text>
-                        <Code display="block" p={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
-                          {event.data}
-                        </Code>
-                      </Box>
-                    )}
-                  </Box>
-                ))}
+                  );
+                })}
               </VStack>
             </Box>
           )}
