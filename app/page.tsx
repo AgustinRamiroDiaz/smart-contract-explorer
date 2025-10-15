@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ConnectButton } from './components/ConnectButton';
 import FunctionCard from './components/FunctionCard';
+import TransactionExplorer from './components/TransactionExplorer';
 import SetupModal from './components/SetupModal';
 import { genlayerTestnet } from './wagmi';
 import {
@@ -23,6 +24,7 @@ import {
   GridItem,
   Button,
   IconButton,
+  Tabs,
 } from '@chakra-ui/react';
 import { Tooltip } from '@chakra-ui/react';
 import {
@@ -703,125 +705,159 @@ export default function Page() {
 
         {/* Main Panel */}
         <GridItem overflowY="auto" bg="white">
-          <Container maxW="container.lg" py={6}>
-            {/* Search Bar */}
-            {contractAbi && contractAddress && allFunctions.length > 0 && (
-              <Box mb={6}>
-                <Field.Root>
-                  <Field.Label fontWeight="semibold">
-                    Search Functions
-                    <Text as="span" ml={2} fontSize="xs" color="gray.500" fontWeight="normal">
-                      (Ctrl+K or Cmd+K to focus)
-                    </Text>
-                  </Field.Label>
-                  <Input
-                    ref={searchInputRef}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by function name..."
-                    size="lg"
-                    fontFamily="mono"
-                  />
-                  {searchTerm && (
-                    <Text fontSize="xs" color="gray.600" mt={1}>
-                      Showing {readFunctions.length + writeFunctions.length} of {allFunctions.length} function{allFunctions.length !== 1 ? 's' : ''}
-                    </Text>
-                  )}
-                </Field.Root>
-              </Box>
-            )}
+          <Tabs.Root defaultValue="functions" variant="enclosed">
+            <Box borderBottomWidth="1px" px={6} pt={4}>
+              <Tabs.List>
+                <Tabs.Trigger value="functions">Function Calling</Tabs.Trigger>
+                <Tabs.Trigger value="transactions">Transaction Explorer</Tabs.Trigger>
+              </Tabs.List>
+            </Box>
 
-            {/* Loading ABI indicator */}
-            {loadingAbi && (
-              <Center py={12}>
-                <VStack>
-                  <Spinner size="lg" />
-                  <Text color="gray.600">Loading contract ABI...</Text>
-                </VStack>
-              </Center>
-            )}
+            <Container maxW="container.lg" py={6}>
+              {/* Function Calling Tab */}
+              <Tabs.Content value="functions">
+                {/* Search Bar */}
+                {contractAbi && contractAddress && allFunctions.length > 0 && (
+                  <Box mb={6}>
+                    <Field.Root>
+                      <Field.Label fontWeight="semibold">
+                        Search Functions
+                        <Text as="span" ml={2} fontSize="xs" color="gray.500" fontWeight="normal">
+                          (Ctrl+K or Cmd+K to focus)
+                        </Text>
+                      </Field.Label>
+                      <Input
+                        ref={searchInputRef}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by function name..."
+                        size="lg"
+                        fontFamily="mono"
+                      />
+                      {searchTerm && (
+                        <Text fontSize="xs" color="gray.600" mt={1}>
+                          Showing {readFunctions.length + writeFunctions.length} of {allFunctions.length} function{allFunctions.length !== 1 ? 's' : ''}
+                        </Text>
+                      )}
+                    </Field.Root>
+                  </Box>
+                )}
 
-            {/* Function List */}
-            {contractAbi && contractAddress && allFunctions.length > 0 && (
-              <>
-                {readFunctions.length === 0 && writeFunctions.length === 0 ? (
+                {/* Loading ABI indicator */}
+                {loadingAbi && (
+                  <Center py={12}>
+                    <VStack>
+                      <Spinner size="lg" />
+                      <Text color="gray.600">Loading contract ABI...</Text>
+                    </VStack>
+                  </Center>
+                )}
+
+                {/* Function List */}
+                {contractAbi && contractAddress && allFunctions.length > 0 && (
+                  <>
+                    {readFunctions.length === 0 && writeFunctions.length === 0 ? (
+                      <Center py={12}>
+                        <VStack gap={2}>
+                          <Text color="gray.500" fontSize="lg">
+                            No functions found matching "{searchTerm}"
+                          </Text>
+                          <Text color="gray.400" fontSize="sm">
+                            Try a different search term
+                          </Text>
+                        </VStack>
+                      </Center>
+                    ) : (
+                      <VStack gap={8} align="stretch">
+                        {/* Write Functions */}
+                        {writeFunctions.length > 0 && (
+                          <Box>
+                            <Heading size="lg" mb={2}>Write Functions</Heading>
+                            <Text fontSize="sm" color="gray.600" mb={4}>
+                              {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
+                            </Text>
+                            {writeFunctions.map((func) => (
+                              <FunctionCard
+                                key={func.name}
+                                func={func}
+                                contractAddress={contractAddress}
+                                contractAbi={contractAbi}
+                                chain={genlayerTestnet}
+                              />
+                            ))}
+                          </Box>
+                        )}
+
+                        {/* Read Functions */}
+                        {readFunctions.length > 0 && (
+                          <Box>
+                            <Heading size="lg" mb={2}>Read Functions</Heading>
+                            <Text fontSize="sm" color="gray.600" mb={4}>
+                              {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
+                            </Text>
+                            {readFunctions.map((func) => (
+                              <FunctionCard
+                                key={func.name}
+                                func={func}
+                                contractAddress={contractAddress}
+                                contractAbi={contractAbi}
+                                chain={genlayerTestnet}
+                              />
+                            ))}
+                          </Box>
+                        )}
+                      </VStack>
+                    )}
+                  </>
+                )}
+
+                {/* No functions message */}
+                {contractAbi && contractAddress && allFunctions.length === 0 && (
+                  <Center py={12}>
+                    <Text color="gray.600">
+                      No functions found in this contract's ABI
+                    </Text>
+                  </Center>
+                )}
+
+                {/* Empty state when no contract selected */}
+                {!loadingAbi && !contractAbi && (
                   <Center py={12}>
                     <VStack gap={2}>
                       <Text color="gray.500" fontSize="lg">
-                        No functions found matching "{searchTerm}"
+                        Select a contract from the sidebar to view functions
                       </Text>
                       <Text color="gray.400" fontSize="sm">
-                        Try a different search term
+                        Configure your deployment and contract settings on the left
                       </Text>
                     </VStack>
                   </Center>
-                ) : (
-                  <VStack gap={8} align="stretch">
-                    {/* Write Functions */}
-                    {writeFunctions.length > 0 && (
-                      <Box>
-                        <Heading size="lg" mb={2}>Write Functions</Heading>
-                        <Text fontSize="sm" color="gray.600" mb={4}>
-                          {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
-                        </Text>
-                        {writeFunctions.map((func) => (
-                          <FunctionCard
-                            key={func.name}
-                            func={func}
-                            contractAddress={contractAddress}
-                            contractAbi={contractAbi}
-                            chain={genlayerTestnet}
-                          />
-                        ))}
-                      </Box>
-                    )}
-
-                    {/* Read Functions */}
-                    {readFunctions.length > 0 && (
-                      <Box>
-                        <Heading size="lg" mb={2}>Read Functions</Heading>
-                        <Text fontSize="sm" color="gray.600" mb={4}>
-                          {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
-                        </Text>
-                        {readFunctions.map((func) => (
-                          <FunctionCard
-                            key={func.name}
-                            func={func}
-                            contractAddress={contractAddress}
-                            contractAbi={contractAbi}
-                            chain={genlayerTestnet}
-                          />
-                        ))}
-                      </Box>
-                    )}
-                  </VStack>
                 )}
-              </>
-            )}
+              </Tabs.Content>
 
-            {/* No functions message */}
-            {contractAbi && contractAddress && allFunctions.length === 0 && (
-              <Center py={12}>
-                <Text color="gray.600">
-                  No functions found in this contract's ABI
-                </Text>
-              </Center>
-            )}
-
-            {/* Empty state when no contract selected */}
-            {!loadingAbi && !contractAbi && (
-              <Center py={12}>
-                <VStack gap={2}>
-                  <Text color="gray.500" fontSize="lg">
-                    Select a contract from the sidebar to view functions
-                  </Text>
-                  <Text color="gray.400" fontSize="sm">
-                    Configure your deployment and contract settings on the left
-                  </Text>
-                </VStack>
-              </Center>
-            )}
-          </Container>
+              {/* Transaction Explorer Tab */}
+              <Tabs.Content value="transactions">
+                {contractAbi && contractAddress ? (
+                  <TransactionExplorer
+                    contractAddress={contractAddress}
+                    contractAbi={contractAbi}
+                    chain={genlayerTestnet}
+                  />
+                ) : (
+                  <Center py={12}>
+                    <VStack gap={2}>
+                      <Text color="gray.500" fontSize="lg">
+                        Select a contract from the sidebar
+                      </Text>
+                      <Text color="gray.400" fontSize="sm">
+                        Configure your deployment and contract settings on the left to explore transactions
+                      </Text>
+                    </VStack>
+                  </Center>
+                )}
+              </Tabs.Content>
+            </Container>
+          </Tabs.Root>
         </GridItem>
       </Grid>
     </Box>
