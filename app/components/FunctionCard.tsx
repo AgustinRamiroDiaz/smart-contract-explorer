@@ -15,10 +15,12 @@ import {
   Collapsible,
   Code,
   Alert,
+  Grid,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
 import { validateSolidityType, getPlaceholderForType } from '@/app/utils/validation';
+import AddressInput from './AddressInput';
 
 type AbiInput = {
   name: string;
@@ -330,25 +332,39 @@ export default function FunctionCard({
                 const hasError = touchedFields[input.name] && validationErrors[input.name];
                 return (
                   <Field.Root key={idx} invalid={!!hasError}>
-                    <Field.Label textStyle="label">
-                      <Text as="span" fontWeight="medium">{input.name}</Text>
-                      <Text as="span" ml={2} color="fg.muted" textStyle="monoCode">
-                        ({input.type})
-                      </Text>
-                    </Field.Label>
-                    <Input
-                      value={args[input.name] || ''}
-                      onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
-                      onBlur={() => handleInputBlur(input.name)}
-                      onKeyDown={handleInputKeyDown}
-                      placeholder={getPlaceholderForType(input.type)}
-                      textStyle="mono"
-                    />
-                    {hasError && (
-                      <Field.ErrorText textStyle="helperText">
-                        {validationErrors[input.name]}
-                      </Field.ErrorText>
-                    )}
+                    <Grid templateColumns="200px 1fr" gap={3} alignItems="start">
+                      <Field.Label textStyle="label" pt={2}>
+                        <Text as="span" fontWeight="medium">{input.name}</Text>
+                        <Text as="span" ml={2} color="fg.muted" textStyle="monoCode">
+                          ({input.type})
+                        </Text>
+                      </Field.Label>
+                      <Box>
+                        {input.type === 'address' ? (
+                          <AddressInput
+                            value={args[input.name] || ''}
+                            onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
+                            onBlur={() => handleInputBlur(input.name)}
+                            onKeyDown={handleInputKeyDown}
+                            placeholder={getPlaceholderForType(input.type)}
+                          />
+                        ) : (
+                          <Input
+                            value={args[input.name] || ''}
+                            onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
+                            onBlur={() => handleInputBlur(input.name)}
+                            onKeyDown={handleInputKeyDown}
+                            placeholder={getPlaceholderForType(input.type)}
+                            textStyle="mono"
+                          />
+                        )}
+                        {hasError && (
+                          <Field.ErrorText textStyle="helperText" mt={1}>
+                            {validationErrors[input.name]}
+                          </Field.ErrorText>
+                        )}
+                      </Box>
+                    </Grid>
                   </Field.Root>
                 );
               })}

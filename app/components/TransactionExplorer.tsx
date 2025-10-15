@@ -14,6 +14,7 @@ import {
   Heading,
   Center,
   Collapsible,
+  Grid,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
@@ -218,22 +219,26 @@ export default function TransactionExplorer({
       {/* Transaction Hash Input */}
       <Box>
         <Field.Root>
-          <Field.Label fontSize="lg" fontWeight="semibold">
-            Transaction Hash
-          </Field.Label>
-          <Input
-            value={txHash}
-            onChange={(e) => setTxHash(e.target.value)}
-            placeholder="0x..."
-            textStyle="mono"
-          />
-          <Field.HelperText textStyle="helperText">
-            {loading ? (
-              <Text color="blue.solid">Loading transaction...</Text>
-            ) : (
-              'Paste a transaction hash (auto-fetches when complete)'
-            )}
-          </Field.HelperText>
+          <Grid templateColumns="200px 1fr" gap={3} alignItems="start">
+            <Field.Label fontSize="lg" fontWeight="semibold" pt={2}>
+              Transaction Hash
+            </Field.Label>
+            <Box>
+              <Input
+                value={txHash}
+                onChange={(e) => setTxHash(e.target.value)}
+                placeholder="0x..."
+                textStyle="mono"
+              />
+              <Field.HelperText textStyle="helperText" mt={1}>
+                {loading ? (
+                  <Text color="blue.solid">Loading transaction...</Text>
+                ) : (
+                  'Paste a transaction hash (auto-fetches when complete)'
+                )}
+              </Field.HelperText>
+            </Box>
+          </Grid>
         </Field.Root>
       </Box>
 
