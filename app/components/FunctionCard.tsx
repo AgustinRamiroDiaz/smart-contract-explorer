@@ -315,28 +315,24 @@ export default function FunctionCard({
     <Box layerStyle="card" mb={4}>
       {/* Header */}
       <HStack
+        as="button"
+        onClick={handleToggle}
+        onKeyDown={handleKeyDown}
         layerStyle="collapsibleHeader"
         width="full"
+        textAlign="left"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${func.name} function - ${func.stateMutability}`}
         gap={2}
       >
-        <HStack
-          as="button"
-          onClick={handleToggle}
-          onKeyDown={handleKeyDown}
-          flex={1}
-          textAlign="left"
-          tabIndex={0}
-          aria-expanded={isExpanded}
-          aria-label={`${func.name} function - ${func.stateMutability}`}
-        >
-          <Text fontSize="xl">{isExpanded ? '▼' : '▶'}</Text>
-          <Text fontWeight="bold" fontFamily="mono" flex={1}>
-            {func.name}
-          </Text>
-          <Badge colorScheme={getStateMutabilityColorScheme()} textTransform="uppercase">
-            {func.stateMutability}
-          </Badge>
-        </HStack>
+        <Text fontSize="xl">{isExpanded ? '▼' : '▶'}</Text>
+        <Text fontWeight="bold" fontFamily="mono" flex={1}>
+          {func.name}
+        </Text>
+        <Badge colorScheme={getStateMutabilityColorScheme()} textTransform="uppercase">
+          {func.stateMutability}
+        </Badge>
         <Button
           onClick={(e) => {
             e.stopPropagation();
