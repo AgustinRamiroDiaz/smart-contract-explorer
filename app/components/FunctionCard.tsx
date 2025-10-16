@@ -327,9 +327,17 @@ export default function FunctionCard({
         gap={2}
       >
         <Text fontSize="xl">{isExpanded ? '▼' : '▶'}</Text>
-        <Text fontWeight="bold" fontFamily="mono" flex={1}>
-          {func.name}
-        </Text>
+        <Box flex={1}>
+          <Text fontWeight="bold" fontFamily="mono" display="inline">
+            {func.name}
+          </Text>
+          <Text fontFamily="mono" color="fg.muted" fontSize="sm" display="inline">
+            ({func.inputs.map(i => `${i.type} ${i.name}`).join(', ')})
+            {func.outputs.length > 0 && (
+              <> → ({func.outputs.map(o => o.type).join(', ')})</>
+            )}
+          </Text>
+        </Box>
         <Badge colorScheme={getStateMutabilityColorScheme()} textTransform="uppercase">
           {func.stateMutability}
         </Badge>
@@ -361,14 +369,6 @@ export default function FunctionCard({
       <Collapsible.Root open={isExpanded}>
         <Collapsible.Content>
         <Box layerStyle="cardSection">
-          {/* Function Signature */}
-          <Code layerStyle="codeBlock" mb={4}>
-            {func.name}({func.inputs.map(i => `${i.type} ${i.name}`).join(', ')})
-            {func.outputs.length > 0 && (
-              <> → ({func.outputs.map(o => o.type).join(', ')})</>
-            )}
-          </Code>
-
           {/* Input Fields */}
           {func.inputs.length > 0 && (
             <VStack gap={3} mb={4} align="stretch">
