@@ -16,6 +16,7 @@ import {
   Code,
   Alert,
   Grid,
+  Skeleton,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
@@ -414,6 +415,18 @@ export default function FunctionCard({
                 );
               })}
             </VStack>
+          )}
+
+          {/* Loading Skeleton for Read Functions */}
+          {loading && isReadFunction && (
+            <Box borderRadius="md" p={4} bg="bg.muted" mb={4}>
+              <Text fontWeight="bold" mb={2}>Result:</Text>
+              <VStack gap={2} align="stretch">
+                <Skeleton height="20px" />
+                <Skeleton height="20px" />
+                <Skeleton height="20px" width="80%" />
+              </VStack>
+            </Box>
           )}
 
           {/* Write Function Status */}
