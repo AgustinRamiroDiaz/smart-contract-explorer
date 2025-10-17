@@ -454,25 +454,18 @@ export default function FunctionCard({
 
           {/* Result Display (for read functions) */}
           {result !== null && isReadFunction && (
-            <Alert.Root status="success" borderRadius="md">
-              <Box width="full">
-                <Text fontWeight="bold" mb={2}>Result:</Text>
-                <Box layerStyle="codeBlock" width="full" overflowX="auto">
-                  {typeof result === 'object' ? (
-                    <JsonEditor
-                      data={serializeBigInts(result)}
-                      setData={() => {}}
-                      rootName="result"
-                      restrictEdit={true}
-                      restrictDelete={true}
-                      restrictAdd={true}
-                    />
-                  ) : (
-                    <Code>{String(result)}</Code>
-                  )}
-                </Box>
+            <Box layerStyle="codeBlock" width="full" overflowX="auto">
+              <Box width="full" css={{ '& > div': { width: '100% !important', maxWidth: '100% !important' } }}>
+                <JsonEditor
+                  data={serializeBigInts(result)}
+                  setData={() => {}}
+                  rootName="result"
+                  restrictEdit={true}
+                  restrictDelete={true}
+                  restrictAdd={true}
+                />
               </Box>
-            </Alert.Root>
+            </Box>
           )}
         </Box>
         </Collapsible.Content>
