@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { ConnectButton } from './components/ConnectButton';
+import { ThemeToggle } from '@/components/ui/theme-selector';
 import FunctionCard from './components/FunctionCard';
 import TransactionExplorer from './components/TransactionExplorer';
 import SetupModal from './components/SetupModal';
@@ -416,7 +417,8 @@ export default function Page() {
       <Grid templateColumns="350px 1fr" h="100vh">
         {/* Sidebar */}
         <GridItem
-          bg="gray.50"
+          bg={{ base: 'gray.50' }}
+          _dark={{ bg: 'gray.900' }}
           borderRightWidth="1px"
           p={6}
           overflowY="auto"
@@ -426,6 +428,9 @@ export default function Page() {
             <Box>
               <ConnectButton />
             </Box>
+
+            {/* Theme Toggle */}
+            <ThemeToggle />
 
             <HStack justify="space-between" align="center">
               <Heading size="md">Configuration</Heading>
@@ -600,7 +605,8 @@ export default function Page() {
                         setSelectedContract('');
                         setError(null);
                       }}
-                      bg="white"
+                      bg={{ base: 'white' }}
+                      _dark={{ bg: 'gray.800' }}
                     >
                       <option value="">-- Select a network --</option>
                       {networkNames.map((name) => (
@@ -623,7 +629,8 @@ export default function Page() {
                           setSelectedContract('');
                           setError(null);
                         }}
-                        bg="white"
+                        bg={{ base: 'white' }}
+                        _dark={{ bg: 'gray.800' }}
                       >
                         <option value="">-- Select a deployment --</option>
                         {deploymentNames.map((name) => (
@@ -653,7 +660,8 @@ export default function Page() {
                           setSelectedContract(e.target.value);
                           setError(null);
                         }}
-                        bg="white"
+                        bg={{ base: 'white' }}
+                        _dark={{ bg: 'gray.800' }}
                       >
                         <option value="">
                           {!abisFolderHandle
@@ -685,7 +693,8 @@ export default function Page() {
                     value={contractAddress}
                     onChange={(e) => setContractAddress(e.target.value)}
                     placeholder="0x..."
-                    bg="white"
+                    bg={{ base: 'white' }}
+                    _dark={{ bg: 'gray.800' }}
                     fontSize="sm"
                     fontFamily="mono"
                   />
@@ -704,7 +713,11 @@ export default function Page() {
         </GridItem>
 
         {/* Main Panel */}
-        <GridItem overflowY="auto" bg="white">
+        <GridItem
+          overflowY="auto"
+          bg={{ base: 'white' }}
+          _dark={{ bg: 'gray.800' }}
+        >
           <Tabs.Root defaultValue="functions" variant="enclosed">
             <Box borderBottomWidth="1px" px={6} pt={4}>
               <Tabs.List>

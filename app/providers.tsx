@@ -6,6 +6,7 @@ import { WagmiProvider } from 'wagmi'
 import { config } from './wagmi'
 import { useState } from 'react'
 import { Toaster } from '@/components/ui/toaster'
+import { ColorModeProvider } from '@/components/ui/color-mode'
 import { system } from './theme'
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -15,8 +16,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <ChakraProvider value={system}>
-          {children}
-          <Toaster />
+          <ColorModeProvider
+            attribute="class"
+            defaultTheme="light"
+            themes={['light', 'dark']}
+          >
+            {children}
+            <Toaster />
+          </ColorModeProvider>
         </ChakraProvider>
       </QueryClientProvider>
     </WagmiProvider>
