@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  Button,
+  Switch,
   ClientOnly,
   Skeleton,
   HStack,
@@ -27,25 +27,28 @@ export function ThemeToggle() {
     )
   }
 
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light')
-  }
+  const isDark = theme === 'dark'
 
   return (
-    <Button
-      onClick={toggleTheme}
-      size="sm"
-      width="full"
-      variant="outline"
-      bg={{ base: 'white' }}
-      _dark={{ bg: 'gray.800' }}
-    >
+    <HStack justify="space-between" w="full">
+      <Text fontSize="sm" fontWeight="semibold">
+        Theme
+      </Text>
       <HStack gap={2}>
-        <Text>{theme === 'light' ? '🌙' : '☀️'}</Text>
-        <Text>
-          {theme === 'light' ? 'Switch to Dark' : 'Switch to Light'}
-        </Text>
+        <Text fontSize="sm">☀️</Text>
+        <Switch.Root
+          checked={isDark}
+          onCheckedChange={(e) => setTheme(e.checked ? 'dark' : 'light')}
+          colorPalette="blue"
+          size="md"
+        >
+          <Switch.HiddenInput />
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
+        </Switch.Root>
+        <Text fontSize="sm">🌙</Text>
       </HStack>
-    </Button>
+    </HStack>
   )
 }
