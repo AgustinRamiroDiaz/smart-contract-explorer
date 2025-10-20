@@ -17,11 +17,15 @@ import {
   Alert,
   Grid,
   Skeleton,
+  Dialog,
+  Portal,
+  IconButton,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
 import { validateSolidityType, getPlaceholderForType } from '@/app/utils/validation';
 import AddressInput from './AddressInput';
+import { LuCopy } from 'react-icons/lu';
 
 type AbiInput = {
   name: string;
@@ -66,6 +70,62 @@ function serializeBigInts(obj: any): any {
   return obj;
 }
 
+// Generate function signature for CLI commands
+function generateFunctionSignature(func: AbiFunction): string {
+  const paramTypes = func.inputs.map(input => input.type).join(',');
+  return `${func.name}(${paramTypes})`;
+}
+
+// Generate Foundry cast command
+function generateFoundryCommand(
+  func: AbiFunction,
+  contractAddress: string,
+  args: Record<string, string>,
+  rpcUrl: string = '$RPC_URL'
+): string {
+  const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
+  const command = isReadFunction ? 'cast call' : 'cast send';
+  const signature = generateFunctionSignature(func);
+
+  // Get args in order
+  const argsArray = func.inputs.map(input => {
+    const value = args[input.name] || '';
+    // Quote string arguments that contain spaces or are addresses
+    if (input.type === 'address' || input.type === 'string' || value.includes(' ')) {
+      return `"${value}"`;
+    }
+    return value || '""';
+  });
+
+  const argsString = argsArray.length > 0 ? ' ' + argsArray.join(' ') : '';
+  const privateKeyFlag = isReadFunction ? '' : ' --private-key $PRIVATE_KEY';
+
+  return `${command} ${contractAddress} "${signature}"${argsString} --rpc-url ${rpcUrl}${privateKeyFlag}`;
+}
+
+// Generate ZKsync CLI command
+function generateZksyncCommand(
+  func: AbiFunction,
+  contractAddress: string,
+  args: Record<string, string>,
+  chain: string = 'zksync-sepolia'
+): string {
+  const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
+  const command = isReadFunction ? 'npx zksync-cli contract read' : 'npx zksync-cli contract write';
+  const signature = generateFunctionSignature(func);
+
+  // Get args in order
+  const argsArray = func.inputs.map(input => {
+    const value = args[input.name] || '';
+    return `"${value}"`;
+  });
+
+  const argsString = argsArray.length > 0 ? ` --args ${argsArray.join(' ')}` : '';
+  const outputType = func.outputs.length > 0 ? ` --output "${func.outputs.map(o => o.type).join(',')}"` : '';
+
+  return `${command} --chain "${chain}" --contract "${contractAddress}" --method "${signature}"${argsString}${isReadFunction ? outputType : ''}`;
+}
+
 export default function FunctionCard({
   func,
   contractAddress,
@@ -79,6 +139,7 @@ export default function FunctionCard({
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCommandsModalOpen, setIsCommandsModalOpen] = useState(false);
 
   const { isConnected } = useAccount();
   const { writeContract, data: hash, isPending: isWritePending } = useWriteContract();
@@ -312,6 +373,26 @@ export default function FunctionCard({
     }
   };
 
+  const copyCommand = async (type: 'foundry' | 'zksync') => {
+    const rpcUrl = chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0];
+    const command = type === 'foundry'
+      ? generateFoundryCommand(func, contractAddress, args, rpcUrl)
+      : generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia');
+
+    try {
+      await navigator.clipboard.writeText(command);
+      toaster.success({
+        title: 'Command copied',
+        description: `${type === 'foundry' ? 'Foundry' : 'ZKsync CLI'} command copied to clipboard`,
+      });
+    } catch (err) {
+      toaster.error({
+        title: 'Failed to copy',
+        description: 'Could not copy command to clipboard',
+      });
+    }
+  };
+
   return (
     <Box layerStyle="card" mb={4}>
       {/* Header */}
@@ -342,6 +423,16 @@ export default function FunctionCard({
         <Badge colorScheme={getStateMutabilityColorScheme()} textTransform="uppercase">
           {func.stateMutability}
         </Badge>
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsCommandsModalOpen(true);
+          }}
+          variant="ghost"
+          size="sm"
+        >
+          CLI commands
+        </Button>
         <Button
           onClick={(e) => {
             e.stopPropagation();
@@ -470,6 +561,74 @@ export default function FunctionCard({
         </Box>
         </Collapsible.Content>
       </Collapsible.Root>
+
+      {/* Commands Modal */}
+      <Dialog.Root open={isCommandsModalOpen} onOpenChange={(e) => setIsCommandsModalOpen(e.open)}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="4xl">
+              <Dialog.Header>
+                <Dialog.Title>CLI Commands</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.CloseTrigger />
+              <Dialog.Body>
+                <VStack gap={4} align="stretch">
+                  {/* Foundry Command */}
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>Foundry Cast Command</Text>
+                    <HStack gap={2} align="start">
+                      <Code
+                        layerStyle="codeBlock"
+                        flex="1"
+                        display="block"
+                        whiteSpace="pre-wrap"
+                        wordBreak="break-all"
+                        p={3}
+                      >
+                        {generateFoundryCommand(func, contractAddress, args, chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0])}
+                      </Code>
+                      <IconButton
+                        aria-label="Copy Foundry command"
+                        onClick={() => copyCommand('foundry')}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        <LuCopy />
+                      </IconButton>
+                    </HStack>
+                  </Box>
+
+                  {/* ZKsync Command */}
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>ZKsync CLI Command</Text>
+                    <HStack gap={2} align="start">
+                      <Code
+                        layerStyle="codeBlock"
+                        flex="1"
+                        display="block"
+                        whiteSpace="pre-wrap"
+                        wordBreak="break-all"
+                        p={3}
+                      >
+                        {generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia')}
+                      </Code>
+                      <IconButton
+                        aria-label="Copy ZKsync command"
+                        onClick={() => copyCommand('zksync')}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        <LuCopy />
+                      </IconButton>
+                    </HStack>
+                  </Box>
+                </VStack>
+              </Dialog.Body>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </Box>
   );
 }
