@@ -1,4 +1,12 @@
 import { Providers } from './providers'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Contract Explorer',
+  icons: {
+    icon: '/ethereum.svg',
+  },
+}
 
 export default function RootLayout({
   children,

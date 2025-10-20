@@ -365,6 +365,15 @@ export default function Page() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [searchTerm]);
 
+  // Update document title based on selected contract
+  useEffect(() => {
+    if (selectedContract) {
+      document.title = selectedContract;
+    } else {
+      document.title = 'Contract Explorer';
+    }
+  }, [selectedContract]);
+
   const networkNames = Object.keys(deploymentsFile);
   const deploymentNames = selectedNetwork
     ? Object.keys(deploymentsFile[selectedNetwork] || {})
