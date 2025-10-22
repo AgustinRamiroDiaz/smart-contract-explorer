@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 export const metadata: Metadata = {
   title: 'Contract Explorer',
   icons: {
-    icon: '/ethereum.svg',
+    icon: 'ethereum.svg',
   },
 }
 
