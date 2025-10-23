@@ -21,7 +21,8 @@ import {
   Portal,
   IconButton,
 } from '@chakra-ui/react';
-import { JsonEditor } from 'json-edit-react';
+import { useColorMode } from '@/components/ui/color-mode';
+import { JsonEditor, githubDarkTheme, githubLightTheme } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
 import { validateSolidityType, getPlaceholderForType } from '@/app/utils/validation';
 import AddressInput from './AddressInput';
@@ -156,6 +157,7 @@ export default function FunctionCard({
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
+  const { colorMode } = useColorMode();
 
   const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
 
@@ -627,6 +629,7 @@ export default function FunctionCard({
                   restrictEdit={true}
                   restrictDelete={true}
                   restrictAdd={true}
+                  theme={colorMode === 'dark' ? githubDarkTheme : githubLightTheme}
                 />
               </Box>
             </Box>
