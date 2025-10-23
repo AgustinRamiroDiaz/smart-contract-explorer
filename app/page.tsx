@@ -791,14 +791,14 @@ export default function Page() {
                       </Center>
                     ) : (
                       <VStack gap={8} align="stretch">
-                        {/* Write Functions */}
-                        {writeFunctions.length > 0 && (
+                        {/* Read Functions */}
+                        {readFunctions.length > 0 && (
                           <Box>
-                            <Heading size="lg" mb={2}>Write Functions</Heading>
+                            <Heading size="lg" mb={2}>Read Functions</Heading>
                             <Text fontSize="sm" color="gray.600" mb={4}>
-                              {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
+                              {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
                             </Text>
-                            {writeFunctions.map((func) => (
+                            {readFunctions.map((func) => (
                               <FunctionCard
                                 key={func.name}
                                 func={func}
@@ -810,14 +810,14 @@ export default function Page() {
                           </Box>
                         )}
 
-                        {/* Read Functions */}
-                        {readFunctions.length > 0 && (
+                        {/* Write Functions */}
+                        {writeFunctions.length > 0 && (
                           <Box>
-                            <Heading size="lg" mb={2}>Read Functions</Heading>
+                            <Heading size="lg" mb={2}>Write Functions</Heading>
                             <Text fontSize="sm" color="gray.600" mb={4}>
-                              {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
+                              {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
                             </Text>
-                            {readFunctions.map((func) => (
+                            {writeFunctions.map((func) => (
                               <FunctionCard
                                 key={func.name}
                                 func={func}
