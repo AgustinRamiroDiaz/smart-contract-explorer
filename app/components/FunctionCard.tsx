@@ -81,7 +81,9 @@ function generateFoundryCommand(
   func: AbiFunction,
   contractAddress: string,
   args: Record<string, string>,
-  rpcUrl: string = '$RPC_URL'
+  rpcUrl: string = '$RPC_URL',
+  blockNumber?: string,
+  value?: string
 ): string {
   const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
   const command = isReadFunction ? 'cast call' : 'cast send';
@@ -99,8 +101,10 @@ function generateFoundryCommand(
 
   const argsString = argsArray.length > 0 ? ' ' + argsArray.join(' ') : '';
   const privateKeyFlag = isReadFunction ? '' : ' --private-key $PRIVATE_KEY';
+  const blockFlag = isReadFunction && blockNumber && blockNumber.trim() !== '' ? ` --block ${blockNumber}` : '';
+  const valueFlag = func.stateMutability === 'payable' && value && value.trim() !== '' ? ` --value ${value}` : '';
 
-  return `${command} ${contractAddress} "${signature}"${argsString} --rpc-url ${rpcUrl}${privateKeyFlag}`;
+  return `${command} ${contractAddress} "${signature}"${argsString} --rpc-url ${rpcUrl}${privateKeyFlag}${blockFlag}${valueFlag}`;
 }
 
 // Generate ZKsync CLI command
@@ -108,7 +112,9 @@ function generateZksyncCommand(
   func: AbiFunction,
   contractAddress: string,
   args: Record<string, string>,
-  chain: string = 'zksync-sepolia'
+  chain: string = 'zksync-sepolia',
+  blockNumber?: string,
+  value?: string
 ): string {
   const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
   const command = isReadFunction ? 'npx zksync-cli contract read' : 'npx zksync-cli contract write';
@@ -122,8 +128,10 @@ function generateZksyncCommand(
 
   const argsString = argsArray.length > 0 ? ` --args ${argsArray.join(' ')}` : '';
   const outputType = func.outputs.length > 0 ? ` --output "${func.outputs.map(o => o.type).join(',')}"` : '';
+  const blockFlag = isReadFunction && blockNumber && blockNumber.trim() !== '' ? ` --block ${blockNumber}` : '';
+  const valueFlag = func.stateMutability === 'payable' && value && value.trim() !== '' ? ` --value ${value}` : '';
 
-  return `${command} --chain "${chain}" --contract "${contractAddress}" --method "${signature}"${argsString}${isReadFunction ? outputType : ''}`;
+  return `${command} --chain "${chain}" --contract "${contractAddress}" --method "${signature}"${argsString}${isReadFunction ? outputType : ''}${blockFlag}${valueFlag}`;
 }
 
 export default function FunctionCard({
@@ -140,6 +148,8 @@ export default function FunctionCard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCommandsModalOpen, setIsCommandsModalOpen] = useState(false);
+  const [blockNumber, setBlockNumber] = useState<string>('');
+  const [value, setValue] = useState<string>('');
 
   const { isConnected } = useAccount();
   const { writeContract, data: hash, isPending: isWritePending } = useWriteContract();
@@ -267,12 +277,19 @@ export default function FunctionCard({
 
       const argsArray = getArgsArray();
 
-      const data = await client.readContract({
+      const readParams: any = {
         address: contractAddress as `0x${string}`,
         abi: contractAbi,
         functionName: func.name,
         args: argsArray,
-      });
+      };
+
+      // Add block number if specified
+      if (blockNumber && blockNumber.trim() !== '') {
+        readParams.blockNumber = BigInt(blockNumber);
+      }
+
+      const data = await client.readContract(readParams);
 
       setResult(data);
       toaster.success({
@@ -318,12 +335,19 @@ export default function FunctionCard({
     try {
       const argsArray = getArgsArray();
 
-      writeContract({
+      const writeParams: any = {
         address: contractAddress as `0x${string}`,
         abi: contractAbi,
         functionName: func.name,
         args: argsArray,
-      });
+      };
+
+      // Add value if specified for payable functions
+      if (func.stateMutability === 'payable' && value && value.trim() !== '') {
+        writeParams.value = BigInt(value);
+      }
+
+      writeContract(writeParams);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send transaction';
       setError(errorMessage);
@@ -376,8 +400,8 @@ export default function FunctionCard({
   const copyCommand = async (type: 'foundry' | 'zksync') => {
     const rpcUrl = chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0];
     const command = type === 'foundry'
-      ? generateFoundryCommand(func, contractAddress, args, rpcUrl)
-      : generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia');
+      ? generateFoundryCommand(func, contractAddress, args, rpcUrl, blockNumber, value)
+      : generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia', blockNumber, value);
 
     try {
       await navigator.clipboard.writeText(command);
@@ -461,52 +485,101 @@ export default function FunctionCard({
       <Collapsible.Root open={isExpanded}>
         <Collapsible.Content>
         <Box layerStyle="cardSection">
-          {/* Input Fields */}
-          {func.inputs.length > 0 && (
-            <VStack gap={3} mb={4} align="stretch">
-              <Text fontWeight="bold">Parameters:</Text>
-              {func.inputs.map((input, idx) => {
-                const hasError = touchedFields[input.name] && validationErrors[input.name];
-                return (
-                  <Field.Root key={idx} invalid={!!hasError}>
-                    <Grid templateColumns="200px 1fr" gap={3} alignItems="start">
-                      <Field.Label textStyle="label" pt={2}>
-                        <Text as="span" fontWeight="medium">{input.name}</Text>
-                        <Text as="span" ml={2} color="fg.muted" textStyle="monoCode">
-                          ({input.type})
-                        </Text>
-                      </Field.Label>
-                      <Box>
-                        {input.type === 'address' ? (
-                          <AddressInput
-                            value={args[input.name] || ''}
-                            onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
-                            onBlur={() => handleInputBlur(input.name)}
-                            onKeyDown={handleInputKeyDown}
-                            placeholder={getPlaceholderForType(input.type)}
-                          />
-                        ) : (
-                          <Input
-                            value={args[input.name] || ''}
-                            onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
-                            onBlur={() => handleInputBlur(input.name)}
-                            onKeyDown={handleInputKeyDown}
-                            placeholder={getPlaceholderForType(input.type)}
-                            textStyle="mono"
-                          />
-                        )}
-                        {hasError && (
-                          <Field.ErrorText textStyle="helperText" mt={1}>
-                            {validationErrors[input.name]}
-                          </Field.ErrorText>
-                        )}
-                      </Box>
-                    </Grid>
-                  </Field.Root>
-                );
-              })}
-            </VStack>
-          )}
+          {/* Two-column layout for Parameters and Block Number/Value */}
+          <Grid
+            templateColumns={isReadFunction || func.stateMutability === 'payable' ? "1fr 300px" : "1fr"}
+            gap={6}
+            alignItems="start"
+          >
+            {/* Input Fields */}
+            {func.inputs.length > 0 && (
+              <VStack gap={3} align="stretch">
+                <Text fontWeight="bold">Parameters:</Text>
+                {func.inputs.map((input, idx) => {
+                  const hasError = touchedFields[input.name] && validationErrors[input.name];
+                  return (
+                    <Field.Root key={idx} invalid={!!hasError}>
+                      <Grid templateColumns="200px 1fr" gap={3} alignItems="start">
+                        <Field.Label textStyle="label" pt={2}>
+                          <Text as="span" fontWeight="medium">{input.name}</Text>
+                          <Text as="span" ml={2} color="fg.muted" textStyle="monoCode">
+                            ({input.type})
+                          </Text>
+                        </Field.Label>
+                        <Box>
+                          {input.type === 'address' ? (
+                            <AddressInput
+                              value={args[input.name] || ''}
+                              onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
+                              onBlur={() => handleInputBlur(input.name)}
+                              onKeyDown={handleInputKeyDown}
+                              placeholder={getPlaceholderForType(input.type)}
+                            />
+                          ) : (
+                            <Input
+                              value={args[input.name] || ''}
+                              onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
+                              onBlur={() => handleInputBlur(input.name)}
+                              onKeyDown={handleInputKeyDown}
+                              placeholder={getPlaceholderForType(input.type)}
+                              textStyle="mono"
+                            />
+                          )}
+                          {hasError && (
+                            <Field.ErrorText textStyle="helperText" mt={1}>
+                              {validationErrors[input.name]}
+                            </Field.ErrorText>
+                          )}
+                        </Box>
+                      </Grid>
+                    </Field.Root>
+                  );
+                })}
+              </VStack>
+            )}
+
+            {/* Block Number Input (for read functions) */}
+            {isReadFunction && (
+              <VStack gap={3} align="stretch">
+                <Text fontWeight="bold">Block Number:</Text>
+                <Field.Root>
+                  <VStack gap={2} align="stretch">
+                    <Input
+                      value={blockNumber}
+                      onChange={(e) => setBlockNumber(e.target.value)}
+                      placeholder="Latest block"
+                      textStyle="mono"
+                      type="number"
+                    />
+                    <Text fontSize="xs" color="fg.muted">
+                      Leave empty for latest block
+                    </Text>
+                  </VStack>
+                </Field.Root>
+              </VStack>
+            )}
+
+            {/* Value Input (for payable functions) */}
+            {func.stateMutability === 'payable' && (
+              <VStack gap={3} align="stretch">
+                <Text fontWeight="bold">Value (wei):</Text>
+                <Field.Root>
+                  <VStack gap={2} align="stretch">
+                    <Input
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                      placeholder="0"
+                      textStyle="mono"
+                      type="number"
+                    />
+                    <Text fontSize="xs" color="fg.muted">
+                      Amount of wei to send with transaction
+                    </Text>
+                  </VStack>
+                </Field.Root>
+              </VStack>
+            )}
+          </Grid>
 
           {/* Loading Skeleton for Read Functions */}
           {loading && isReadFunction && (
@@ -586,7 +659,7 @@ export default function FunctionCard({
                         wordBreak="break-all"
                         p={3}
                       >
-                        {generateFoundryCommand(func, contractAddress, args, chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0])}
+                        {generateFoundryCommand(func, contractAddress, args, chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0], blockNumber, value)}
                       </Code>
                       <IconButton
                         aria-label="Copy Foundry command"
@@ -611,7 +684,7 @@ export default function FunctionCard({
                         wordBreak="break-all"
                         p={3}
                       >
-                        {generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia')}
+                        {generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia', blockNumber, value)}
                       </Code>
                       <IconButton
                         aria-label="Copy ZKsync command"
