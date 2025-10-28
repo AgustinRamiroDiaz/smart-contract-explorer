@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import {
   Box,
   VStack,
@@ -23,7 +23,13 @@ type AbiFunction = {
   outputs: any[];
 };
 
-export default function FunctionsPage() {
+// Generate function signature for unique keys
+function generateFunctionSignature(func: AbiFunction): string {
+  const paramTypes = func.inputs.map(input => input.type).join(',');
+  return `${func.name}(${paramTypes})`;
+}
+
+function FunctionsPageContent() {
   const { contractAbi, contractAddress, loadingAbi } = useContract();
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -134,7 +140,7 @@ export default function FunctionsPage() {
                   </Text>
                   {readFunctions.map((func) => (
                     <FunctionCard
-                      key={func.name}
+                      key={generateFunctionSignature(func)}
                       func={func}
                       contractAddress={contractAddress}
                       contractAbi={contractAbi}
@@ -153,7 +159,7 @@ export default function FunctionsPage() {
                   </Text>
                   {writeFunctions.map((func) => (
                     <FunctionCard
-                      key={func.name}
+                      key={generateFunctionSignature(func)}
                       func={func}
                       contractAddress={contractAddress}
                       contractAbi={contractAbi}
@@ -190,5 +196,20 @@ export default function FunctionsPage() {
         </Center>
       )}
     </VStack>
+  );
+}
+
+export default function FunctionsPage() {
+  return (
+    <Suspense fallback={
+      <Center py={12}>
+        <VStack>
+          <Spinner size="lg" />
+          <Text color="gray.600">Loading...</Text>
+        </VStack>
+      </Center>
+    }>
+      <FunctionsPageContent />
+    </Suspense>
   );
 }

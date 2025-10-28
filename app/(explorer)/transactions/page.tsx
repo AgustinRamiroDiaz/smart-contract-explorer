@@ -1,15 +1,17 @@
 'use client';
 
+import { Suspense } from 'react';
 import {
   VStack,
   Text,
   Center,
+  Spinner,
 } from '@chakra-ui/react';
 import TransactionExplorer from '@/app/components/TransactionExplorer';
 import { genlayerTestnet } from '@/app/wagmi';
 import { useContract } from '@/app/context/ContractContext';
 
-export default function TransactionsPage() {
+function TransactionsPageContent() {
   const { contractAbi } = useContract();
 
   return (
@@ -32,5 +34,20 @@ export default function TransactionsPage() {
         </Center>
       )}
     </VStack>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={
+      <Center py={12}>
+        <VStack>
+          <Spinner size="lg" />
+          <Text color="gray.600">Loading...</Text>
+        </VStack>
+      </Center>
+    }>
+      <TransactionsPageContent />
+    </Suspense>
   );
 }

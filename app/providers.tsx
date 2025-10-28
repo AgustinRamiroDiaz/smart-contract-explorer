@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { ChakraProvider } from '@chakra-ui/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WagmiProvider } from 'wagmi'
@@ -22,10 +23,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
             defaultTheme="light"
             themes={['light', 'dark']}
           >
-            <ContractProvider>
-              {children}
-              <Toaster />
-            </ContractProvider>
+            <Suspense fallback={<div>Loading...</div>}>
+              <ContractProvider>
+                {children}
+                <Toaster />
+              </ContractProvider>
+            </Suspense>
           </ColorModeProvider>
         </ChakraProvider>
       </QueryClientProvider>

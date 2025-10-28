@@ -1,15 +1,17 @@
 'use client';
 
+import { Suspense } from 'react';
 import {
   VStack,
   Text,
   Center,
+  Spinner,
 } from '@chakra-ui/react';
 import EventLogsExplorer from '@/app/components/EventLogsExplorer';
 import { genlayerTestnet } from '@/app/wagmi';
 import { useContract } from '@/app/context/ContractContext';
 
-export default function EventsPage() {
+function EventsPageContent() {
   const { contractAbi, contractAddress } = useContract();
 
   return (
@@ -33,5 +35,20 @@ export default function EventsPage() {
         </Center>
       )}
     </VStack>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <Suspense fallback={
+      <Center py={12}>
+        <VStack>
+          <Spinner size="lg" />
+          <Text color="gray.600">Loading...</Text>
+        </VStack>
+      </Center>
+    }>
+      <EventsPageContent />
+    </Suspense>
   );
 }
