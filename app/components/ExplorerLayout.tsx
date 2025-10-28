@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   Box,
@@ -21,6 +21,7 @@ interface ExplorerLayoutProps {
 
 export default function ExplorerLayout({ children }: ExplorerLayoutProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const {
     showSetupModal,
     setShowSetupModal,
@@ -30,6 +31,12 @@ export default function ExplorerLayout({ children }: ExplorerLayoutProps) {
   } = useContract();
 
   const isActive = (path: string) => pathname === path;
+
+  // Helper function to build URL with current query params
+  const buildUrlWithParams = (path: string) => {
+    const params = searchParams?.toString();
+    return params ? `${path}?${params}` : path;
+  };
 
   return (
     <Box minH="100vh">
@@ -58,7 +65,7 @@ export default function ExplorerLayout({ children }: ExplorerLayoutProps) {
           {/* Navigation Tabs */}
           <Box borderBottomWidth="1px" px={6} pt={4} pb={2}>
             <HStack gap={2}>
-              <Link href="/functions" passHref>
+              <Link href={buildUrlWithParams('/functions')} passHref>
                 <Button
                   variant={isActive('/functions') ? 'solid' : 'ghost'}
                   colorScheme={isActive('/functions') ? 'blue' : 'gray'}
@@ -67,7 +74,7 @@ export default function ExplorerLayout({ children }: ExplorerLayoutProps) {
                   Function Calling
                 </Button>
               </Link>
-              <Link href="/transactions" passHref>
+              <Link href={buildUrlWithParams('/transactions')} passHref>
                 <Button
                   variant={isActive('/transactions') ? 'solid' : 'ghost'}
                   colorScheme={isActive('/transactions') ? 'blue' : 'gray'}
@@ -76,7 +83,7 @@ export default function ExplorerLayout({ children }: ExplorerLayoutProps) {
                   Transaction Explorer
                 </Button>
               </Link>
-              <Link href="/events" passHref>
+              <Link href={buildUrlWithParams('/events')} passHref>
                 <Button
                   variant={isActive('/events') ? 'solid' : 'ghost'}
                   colorScheme={isActive('/events') ? 'blue' : 'gray'}

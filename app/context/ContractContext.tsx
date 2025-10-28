@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   saveFolderHandle,
   getFolderHandle,
@@ -57,11 +58,15 @@ interface ContractContextType {
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
 
 export function ContractProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
   const [deploymentsFile, setDeploymentsFile] = useState<DeploymentsFile>({});
   const [deploymentsFileHandle, setDeploymentsFileHandle] = useState<FileSystemFileHandle | null>(null);
-  const [selectedNetwork, setSelectedNetwork] = useState('');
-  const [selectedDeployment, setSelectedDeployment] = useState('');
-  const [selectedContract, setSelectedContract] = useState('');
+  const [selectedNetworkState, setSelectedNetworkState] = useState('');
+  const [selectedDeploymentState, setSelectedDeploymentState] = useState('');
+  const [selectedContractState, setSelectedContractState] = useState('');
   const [contractAddress, setContractAddress] = useState('');
   const [contractAbi, setContractAbi] = useState<any[] | null>(null);
   const [loadingAbi, setLoadingAbi] = useState(false);
@@ -71,6 +76,59 @@ export function ContractProvider({ children }: { children: ReactNode }) {
   const [loadingAbiList, setLoadingAbiList] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showSetupModal, setShowSetupModal] = useState(false);
+
+  // Helper function to update URL params
+  const updateURLParams = useCallback((network: string, deployment: string, contract: string) => {
+    const params = new URLSearchParams(searchParams?.toString());
+
+    if (network) {
+      params.set('network', network);
+    } else {
+      params.delete('network');
+    }
+
+    if (deployment) {
+      params.set('deployment', deployment);
+    } else {
+      params.delete('deployment');
+    }
+
+    if (contract) {
+      params.set('contract', contract);
+    } else {
+      params.delete('contract');
+    }
+
+    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    router.replace(newUrl, { scroll: false });
+  }, [searchParams, pathname, router]);
+
+  // Wrapper setters that update both state and URL
+  const setSelectedNetwork = useCallback((network: string) => {
+    setSelectedNetworkState(network);
+    updateURLParams(network, '', '');
+  }, [updateURLParams]);
+
+  const setSelectedDeployment = useCallback((deployment: string) => {
+    setSelectedDeploymentState(deployment);
+    // Use the setter function form to get the latest state
+    setSelectedNetworkState((currentNetwork) => {
+      updateURLParams(currentNetwork, deployment, '');
+      return currentNetwork;
+    });
+  }, [updateURLParams]);
+
+  const setSelectedContract = useCallback((contract: string) => {
+    setSelectedContractState(contract);
+    // Use the setter function form to get the latest state
+    setSelectedNetworkState((currentNetwork) => {
+      setSelectedDeploymentState((currentDeployment) => {
+        updateURLParams(currentNetwork, currentDeployment, contract);
+        return currentDeployment;
+      });
+      return currentNetwork;
+    });
+  }, [updateURLParams]);
 
   // Initialize: Restore deployments and folder handle from storage
   useEffect(() => {
@@ -94,19 +152,48 @@ export function ContractProvider({ children }: { children: ReactNode }) {
               setDeploymentsFileHandle(savedFileHandle);
               hasDeployments = true;
 
-              // Restore network/deployment selections
+              // Restore network/deployment/contract selections
               const networks = Object.keys(data);
               if (networks.length > 0) {
-                const savedNetwork = localStorage.getItem('selectedNetwork');
-                const savedDeployment = localStorage.getItem('selectedDeployment');
+                // Priority 1: URL params
+                const urlNetwork = searchParams?.get('network');
+                const urlDeployment = searchParams?.get('deployment');
+                const urlContract = searchParams?.get('contract');
 
-                if (savedNetwork && data[savedNetwork]) {
-                  setSelectedNetwork(savedNetwork);
-                  if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
-                    setSelectedDeployment(savedDeployment);
+                if (urlNetwork && data[urlNetwork]) {
+                  setSelectedNetworkState(urlNetwork);
+                  if (urlDeployment && data[urlNetwork]?.[urlDeployment]) {
+                    setSelectedDeploymentState(urlDeployment);
+                    if (urlContract && data[urlNetwork][urlDeployment]?.[urlContract]) {
+                      setSelectedContractState(urlContract);
+                    } else if (urlContract) {
+                      // Contract in URL but not found
+                      toaster.error({
+                        title: 'Contract not found',
+                        description: `Contract "${urlContract}" not found in the selected deployment`,
+                      });
+                    }
+                  } else if (urlDeployment) {
+                    // Deployment in URL but not found
+                    toaster.error({
+                      title: 'Deployment not found',
+                      description: `Deployment "${urlDeployment}" not found in the selected network`,
+                    });
                   }
-                } else if (networks.length === 1) {
-                  setSelectedNetwork(networks[0]);
+                }
+                // Priority 2: localStorage fallback
+                else {
+                  const savedNetwork = localStorage.getItem('selectedNetwork');
+                  const savedDeployment = localStorage.getItem('selectedDeployment');
+
+                  if (savedNetwork && data[savedNetwork]) {
+                    setSelectedNetworkState(savedNetwork);
+                    if (savedDeployment && data[savedNetwork]?.[savedDeployment]) {
+                      setSelectedDeploymentState(savedDeployment);
+                    }
+                  } else if (networks.length === 1) {
+                    setSelectedNetworkState(networks[0]);
+                  }
                 }
               }
             } catch (err) {
@@ -270,35 +357,35 @@ export function ContractProvider({ children }: { children: ReactNode }) {
 
   // Save network and deployment to localStorage when changed
   useEffect(() => {
-    if (selectedNetwork) {
-      localStorage.setItem('selectedNetwork', selectedNetwork);
+    if (selectedNetworkState) {
+      localStorage.setItem('selectedNetwork', selectedNetworkState);
     }
-  }, [selectedNetwork]);
+  }, [selectedNetworkState]);
 
   useEffect(() => {
-    if (selectedDeployment) {
-      localStorage.setItem('selectedDeployment', selectedDeployment);
+    if (selectedDeploymentState) {
+      localStorage.setItem('selectedDeployment', selectedDeploymentState);
     }
-  }, [selectedDeployment]);
+  }, [selectedDeploymentState]);
 
   // Update contract address when deployment or contract is selected
   useEffect(() => {
-    if (selectedNetwork && selectedDeployment && selectedContract) {
-      const address = deploymentsFile[selectedNetwork]?.[selectedDeployment]?.[selectedContract];
+    if (selectedNetworkState && selectedDeploymentState && selectedContractState) {
+      const address = deploymentsFile[selectedNetworkState]?.[selectedDeploymentState]?.[selectedContractState];
       if (address && address.startsWith('0x')) {
         setContractAddress(address);
       }
     }
-  }, [selectedNetwork, selectedDeployment, selectedContract, deploymentsFile]);
+  }, [selectedNetworkState, selectedDeploymentState, selectedContractState, deploymentsFile]);
 
   // Load ABI when contract is selected
   useEffect(() => {
-    if (selectedContract && abisFolderHandle) {
-      loadAbiFromFolder(selectedContract);
+    if (selectedContractState && abisFolderHandle) {
+      loadAbiFromFolder(selectedContractState);
     } else {
       setContractAbi(null);
     }
-  }, [selectedContract, abisFolderHandle]);
+  }, [selectedContractState, abisFolderHandle]);
 
   // Load ABI from the selected folder
   const loadAbiFromFolder = async (contractName: string) => {
@@ -334,23 +421,23 @@ export function ContractProvider({ children }: { children: ReactNode }) {
 
   // Update document title based on selected contract
   useEffect(() => {
-    if (selectedContract) {
-      document.title = selectedContract;
+    if (selectedContractState) {
+      document.title = selectedContractState;
     } else {
       document.title = 'Contract Explorer';
     }
-  }, [selectedContract]);
+  }, [selectedContractState]);
 
   const value = {
     deploymentsFile,
     setDeploymentsFile,
     deploymentsFileHandle,
     setDeploymentsFileHandle,
-    selectedNetwork,
+    selectedNetwork: selectedNetworkState,
     setSelectedNetwork,
-    selectedDeployment,
+    selectedDeployment: selectedDeploymentState,
     setSelectedDeployment,
-    selectedContract,
+    selectedContract: selectedContractState,
     setSelectedContract,
     contractAddress,
     setContractAddress,
