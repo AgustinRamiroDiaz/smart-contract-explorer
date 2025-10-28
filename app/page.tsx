@@ -5,6 +5,7 @@ import { ConnectButton } from './components/ConnectButton';
 import { ThemeToggle } from '@/components/ui/theme-selector';
 import FunctionCard from './components/FunctionCard';
 import TransactionExplorer from './components/TransactionExplorer';
+import EventLogsExplorer from './components/EventLogsExplorer';
 import SetupModal from './components/SetupModal';
 import { genlayerTestnet } from './wagmi';
 import {
@@ -732,6 +733,7 @@ export default function Page() {
               <Tabs.List>
                 <Tabs.Trigger value="functions">Function Calling</Tabs.Trigger>
                 <Tabs.Trigger value="transactions">Transaction Explorer</Tabs.Trigger>
+                <Tabs.Trigger value="logs">Event Logs</Tabs.Trigger>
               </Tabs.List>
             </Box>
 
@@ -872,6 +874,28 @@ export default function Page() {
                       </Text>
                       <Text color="gray.400" fontSize="sm">
                         Configure your deployment and contract settings on the left to explore transactions
+                      </Text>
+                    </VStack>
+                  </Center>
+                )}
+              </Tabs.Content>
+
+              {/* Event Logs Tab */}
+              <Tabs.Content value="logs">
+                {contractAbi && contractAddress ? (
+                  <EventLogsExplorer
+                    contractAddress={contractAddress}
+                    contractAbi={contractAbi}
+                    chain={genlayerTestnet}
+                  />
+                ) : (
+                  <Center py={12}>
+                    <VStack gap={2}>
+                      <Text color="gray.500" fontSize="lg">
+                        Select a contract from the sidebar
+                      </Text>
+                      <Text color="gray.400" fontSize="sm">
+                        Configure your deployment and contract settings on the left to search for event logs
                       </Text>
                     </VStack>
                   </Center>
