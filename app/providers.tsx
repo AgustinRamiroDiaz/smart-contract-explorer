@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { Toaster } from '@/components/ui/toaster'
 import { ColorModeProvider } from '@/components/ui/color-mode'
 import { system } from './theme'
+import { ContractProvider } from './context/ContractContext'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
@@ -21,8 +22,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
             defaultTheme="light"
             themes={['light', 'dark']}
           >
-            {children}
-            <Toaster />
+            <ContractProvider>
+              {children}
+              <Toaster />
+            </ContractProvider>
           </ColorModeProvider>
         </ChakraProvider>
       </QueryClientProvider>
