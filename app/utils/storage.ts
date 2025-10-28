@@ -188,8 +188,10 @@ export async function requestFilePermission(
 /**
  * Reads and parses JSON from a file handle
  */
-export async function readJsonFile(handle: FileSystemFileHandle): Promise<any> {
+export async function readJsonFile<T = Record<string, unknown>>(
+  handle: FileSystemFileHandle
+): Promise<T> {
   const file = await handle.getFile();
   const text = await file.text();
-  return JSON.parse(text);
+  return JSON.parse(text) as T;
 }

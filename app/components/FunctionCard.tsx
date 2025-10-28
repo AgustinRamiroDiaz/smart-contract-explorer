@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPublicClient, http } from 'viem';
+import type { Chain } from 'viem';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import {
   Box,
@@ -27,48 +28,27 @@ import { toaster } from '@/components/ui/toaster';
 import { validateSolidityType, getPlaceholderForType } from '@/app/utils/validation';
 import AddressInput from './AddressInput';
 import { LuCopy } from 'react-icons/lu';
-
-type AbiInput = {
-  name: string;
-  type: string;
-  internalType?: string;
-};
-
-type AbiOutput = {
-  name: string;
-  type: string;
-  internalType?: string;
-};
-
-type AbiFunction = {
-  name: string;
-  type: string;
-  stateMutability: string;
-  inputs: AbiInput[];
-  outputs: AbiOutput[];
-};
-
-interface FunctionCardProps {
-  func: AbiFunction;
-  contractAddress: string;
-  contractAbi: any[];
-  chain: any;
-}
+import type { FunctionCardProps, AbiFunction, SerializableValue, ContractAbi } from '../types';
 
 // Utility function to convert BigInts to strings for JSON display
-function serializeBigInts(obj: any): any {
+function serializeBigInts(obj: unknown): SerializableValue {
   if (typeof obj === 'bigint') {
     return obj.toString();
   }
   if (Array.isArray(obj)) {
-    return obj.map(serializeBigInts);
+    return obj.map(serializeBigInts) as SerializableValue[];
   }
   if (obj !== null && typeof obj === 'object') {
-    return Object.fromEntries(
-      Object.entries(obj).map(([key, value]) => [key, serializeBigInts(value)])
-    );
+    const result: Record<string, SerializableValue> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = serializeBigInts(value);
+    }
+    return result;
   }
-  return obj;
+  if (obj === null || typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') {
+    return obj;
+  }
+  return String(obj);
 }
 
 // Generate function signature for CLI commands
@@ -82,7 +62,7 @@ function generateFoundryCommand(
   func: AbiFunction,
   contractAddress: string,
   args: Record<string, string>,
-  rpcUrl: string = '$RPC_URL',
+  rpcUrl?: string,
   blockNumber?: string,
   value?: string
 ): string {
@@ -92,20 +72,21 @@ function generateFoundryCommand(
 
   // Get args in order
   const argsArray = func.inputs.map(input => {
-    const value = args[input.name] || '';
+    const argValue = args[input.name] || '';
     // Quote string arguments that contain spaces or are addresses
-    if (input.type === 'address' || input.type === 'string' || value.includes(' ')) {
-      return `"${value}"`;
+    if (input.type === 'address' || input.type === 'string' || argValue.includes(' ')) {
+      return `"${argValue}"`;
     }
-    return value || '""';
+    return argValue || '""';
   });
 
   const argsString = argsArray.length > 0 ? ' ' + argsArray.join(' ') : '';
   const privateKeyFlag = isReadFunction ? '' : ' --private-key $PRIVATE_KEY';
   const blockFlag = isReadFunction && blockNumber && blockNumber.trim() !== '' ? ` --block ${blockNumber}` : '';
   const valueFlag = func.stateMutability === 'payable' && value && value.trim() !== '' ? ` --value ${value}` : '';
+  const rpcUrlValue = rpcUrl || '$RPC_URL';
 
-  return `${command} ${contractAddress} "${signature}"${argsString} --rpc-url ${rpcUrl}${privateKeyFlag}${blockFlag}${valueFlag}`;
+  return `${command} ${contractAddress} "${signature}"${argsString} --rpc-url ${rpcUrlValue}${privateKeyFlag}${blockFlag}${valueFlag}`;
 }
 
 // Generate ZKsync CLI command
@@ -113,7 +94,7 @@ function generateZksyncCommand(
   func: AbiFunction,
   contractAddress: string,
   args: Record<string, string>,
-  chain: string = 'zksync-sepolia',
+  chainNetwork?: string,
   blockNumber?: string,
   value?: string
 ): string {
@@ -123,16 +104,17 @@ function generateZksyncCommand(
 
   // Get args in order
   const argsArray = func.inputs.map(input => {
-    const value = args[input.name] || '';
-    return `"${value}"`;
+    const argValue = args[input.name] || '';
+    return `"${argValue}"`;
   });
 
   const argsString = argsArray.length > 0 ? ` --args ${argsArray.join(' ')}` : '';
   const outputType = func.outputs.length > 0 ? ` --output "${func.outputs.map(o => o.type).join(',')}"` : '';
   const blockFlag = isReadFunction && blockNumber && blockNumber.trim() !== '' ? ` --block ${blockNumber}` : '';
   const valueFlag = func.stateMutability === 'payable' && value && value.trim() !== '' ? ` --value ${value}` : '';
+  const chainValue = chainNetwork || 'zksync-sepolia';
 
-  return `${command} --chain "${chain}" --contract "${contractAddress}" --method "${signature}"${argsString}${isReadFunction ? outputType : ''}${blockFlag}${valueFlag}`;
+  return `${command} --chain "${chainValue}" --contract "${contractAddress}" --method "${signature}"${argsString}${isReadFunction ? outputType : ''}${blockFlag}${valueFlag}`;
 }
 
 export default function FunctionCard({
@@ -141,14 +123,14 @@ export default function FunctionCard({
   contractAbi,
   chain
 }: FunctionCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [args, setArgs] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<unknown>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [isCommandsModalOpen, setIsCommandsModalOpen] = useState(false);
+  const [isCommandsModalOpen, setIsCommandsModalOpen] = useState<boolean>(false);
   const [blockNumber, setBlockNumber] = useState<string>('');
   const [value, setValue] = useState<string>('');
 
@@ -242,17 +224,17 @@ export default function FunctionCard({
   };
 
   // Convert args to array in correct order
-  const getArgsArray = () => {
+  const getArgsArray = (): unknown[] => {
     return func.inputs.map(input => {
-      const value = args[input.name] || '';
+      const argValue = args[input.name] || '';
       // Basic type conversion
       if (input.type.includes('uint') || input.type.includes('int')) {
-        return value ? BigInt(value) : BigInt(0);
+        return argValue ? BigInt(argValue) : BigInt(0);
       }
       if (input.type === 'bool') {
-        return value.toLowerCase() === 'true';
+        return argValue.toLowerCase() === 'true';
       }
-      return value;
+      return argValue;
     });
   };
 
@@ -279,7 +261,15 @@ export default function FunctionCard({
 
       const argsArray = getArgsArray();
 
-      const readParams: any = {
+      interface ReadContractParams {
+        address: `0x${string}`;
+        abi: ContractAbi;
+        functionName: string;
+        args: unknown[];
+        blockNumber?: bigint;
+      }
+
+      const readParams: ReadContractParams = {
         address: contractAddress as `0x${string}`,
         abi: contractAbi,
         functionName: func.name,
@@ -337,7 +327,15 @@ export default function FunctionCard({
     try {
       const argsArray = getArgsArray();
 
-      const writeParams: any = {
+      interface WriteContractParams {
+        address: `0x${string}`;
+        abi: ContractAbi;
+        functionName: string;
+        args: unknown[];
+        value?: bigint;
+      }
+
+      const writeParams: WriteContractParams = {
         address: contractAddress as `0x${string}`,
         abi: contractAbi,
         functionName: func.name,
@@ -400,10 +398,11 @@ export default function FunctionCard({
   };
 
   const copyCommand = async (type: 'foundry' | 'zksync') => {
-    const rpcUrl = chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0];
+    const rpcUrl: string | undefined = chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0];
+    const chainNetwork: string | undefined = 'network' in chain ? (chain.network as string) : undefined;
     const command = type === 'foundry'
       ? generateFoundryCommand(func, contractAddress, args, rpcUrl, blockNumber, value)
-      : generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia', blockNumber, value);
+      : generateZksyncCommand(func, contractAddress, args, chainNetwork, blockNumber, value);
 
     try {
       await navigator.clipboard.writeText(command);
@@ -687,7 +686,7 @@ export default function FunctionCard({
                         wordBreak="break-all"
                         p={3}
                       >
-                        {generateZksyncCommand(func, contractAddress, args, chain.network || 'zksync-sepolia', blockNumber, value)}
+                        {generateZksyncCommand(func, contractAddress, args, ('network' in chain ? (chain.network as string) : undefined), blockNumber, value)}
                       </Code>
                       <IconButton
                         aria-label="Copy ZKsync command"

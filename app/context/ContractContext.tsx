@@ -14,46 +14,7 @@ import {
   readJsonFile
 } from '../utils/storage';
 import { toaster } from '@/components/ui/toaster';
-
-type Deployment = Record<string, string>; // contract name -> address
-type Network = Record<string, Deployment>; // deployment name -> deployment
-type DeploymentsFile = Record<string, Network>; // network name -> network
-
-interface ContractContextType {
-  deploymentsFile: DeploymentsFile;
-  setDeploymentsFile: (file: DeploymentsFile) => void;
-  deploymentsFileHandle: FileSystemFileHandle | null;
-  setDeploymentsFileHandle: (handle: FileSystemFileHandle | null) => void;
-  selectedNetwork: string;
-  setSelectedNetwork: (network: string) => void;
-  selectedDeployment: string;
-  setSelectedDeployment: (deployment: string) => void;
-  selectedContract: string;
-  setSelectedContract: (contract: string) => void;
-  contractAddress: string;
-  setContractAddress: (address: string) => void;
-  contractAbi: any[] | null;
-  setContractAbi: (abi: any[] | null) => void;
-  loadingAbi: boolean;
-  setLoadingAbi: (loading: boolean) => void;
-  error: string | null;
-  setError: (error: string | null) => void;
-  abisFolderHandle: FileSystemDirectoryHandle | null;
-  setAbisFolderHandle: (handle: FileSystemDirectoryHandle | null) => void;
-  availableAbis: Set<string>;
-  setAvailableAbis: (abis: Set<string>) => void;
-  loadingAbiList: boolean;
-  setLoadingAbiList: (loading: boolean) => void;
-  isInitializing: boolean;
-  showSetupModal: boolean;
-  setShowSetupModal: (show: boolean) => void;
-  handleSelectDeploymentsFile: () => Promise<void>;
-  handleSelectAbisFolder: () => Promise<void>;
-  handleSetupComplete: (fileHandle: FileSystemFileHandle | null, folderHandle: FileSystemDirectoryHandle | null) => Promise<void>;
-  handleReconfigure: () => void;
-  scanAbisFolder: (dirHandle: FileSystemDirectoryHandle) => Promise<void>;
-  loadAbiFromFolder: (contractName: string) => Promise<void>;
-}
+import type { ContractContextType, DeploymentsFile, ContractAbi } from '../types';
 
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
 
@@ -64,18 +25,18 @@ export function ContractProvider({ children }: { children: ReactNode }) {
 
   const [deploymentsFile, setDeploymentsFile] = useState<DeploymentsFile>({});
   const [deploymentsFileHandle, setDeploymentsFileHandle] = useState<FileSystemFileHandle | null>(null);
-  const [selectedNetworkState, setSelectedNetworkState] = useState('');
-  const [selectedDeploymentState, setSelectedDeploymentState] = useState('');
-  const [selectedContractState, setSelectedContractState] = useState('');
-  const [contractAddress, setContractAddress] = useState('');
-  const [contractAbi, setContractAbi] = useState<any[] | null>(null);
-  const [loadingAbi, setLoadingAbi] = useState(false);
+  const [selectedNetworkState, setSelectedNetworkState] = useState<string>('');
+  const [selectedDeploymentState, setSelectedDeploymentState] = useState<string>('');
+  const [selectedContractState, setSelectedContractState] = useState<string>('');
+  const [contractAddress, setContractAddress] = useState<string>('');
+  const [contractAbi, setContractAbi] = useState<ContractAbi | null>(null);
+  const [loadingAbi, setLoadingAbi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [abisFolderHandle, setAbisFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
-  const [loadingAbiList, setLoadingAbiList] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [showSetupModal, setShowSetupModal] = useState(false);
+  const [loadingAbiList, setLoadingAbiList] = useState<boolean>(false);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
 
   // Helper function to update URL params
   const updateURLParams = useCallback((network: string, deployment: string, contract: string) => {
@@ -147,7 +108,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
           if (hasPermission) {
             try {
               // Read and parse the file
-              const data = await readJsonFile(savedFileHandle);
+              const data = await readJsonFile<DeploymentsFile>(savedFileHandle);
               setDeploymentsFile(data);
               setDeploymentsFileHandle(savedFileHandle);
               hasDeployments = true;
@@ -257,7 +218,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       });
 
       // Read and parse the file
-      const data = await readJsonFile(fileHandle);
+      const data = await readJsonFile<DeploymentsFile>(fileHandle);
 
       setDeploymentsFile(data);
       setDeploymentsFileHandle(fileHandle);
@@ -300,7 +261,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
   const handleSetupComplete = async (fileHandle: FileSystemFileHandle | null, folderHandle: FileSystemDirectoryHandle | null) => {
     // Save deployments file handle if provided
     if (fileHandle) {
-      const data = await readJsonFile(fileHandle);
+      const data = await readJsonFile<DeploymentsFile>(fileHandle);
       setDeploymentsFile(data);
       setDeploymentsFileHandle(fileHandle);
       await saveFileHandle(fileHandle);
@@ -331,14 +292,18 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     const foundAbis = new Set<string>();
 
     try {
-      // @ts-ignore
-      for await (const entry of dirHandle.values()) {
+      // TypeScript doesn't have the full FileSystemDirectoryHandle API, so we need to cast
+      type AsyncIterableDirectoryHandle = FileSystemDirectoryHandle & {
+        values(): AsyncIterableIterator<FileSystemHandle>;
+      };
+
+      for await (const entry of (dirHandle as AsyncIterableDirectoryHandle).values()) {
         if (entry.kind === 'directory' && entry.name.endsWith('.sol')) {
           const contractName = entry.name.replace('.sol', '');
 
           try {
             // Check if the contract's JSON file exists
-            await entry.getFileHandle(`${contractName}.json`);
+            await (entry as FileSystemDirectoryHandle).getFileHandle(`${contractName}.json`);
             foundAbis.add(contractName);
           } catch {
             // File doesn't exist, skip
@@ -393,16 +358,20 @@ export function ContractProvider({ children }: { children: ReactNode }) {
 
     setLoadingAbi(true);
     try {
-      // @ts-ignore
       const solDir = await abisFolderHandle.getDirectoryHandle(`${contractName}.sol`);
-      // @ts-ignore
       const jsonFile = await solDir.getFileHandle(`${contractName}.json`);
       const file = await jsonFile.getFile();
       const text = await file.text();
-      const data = JSON.parse(text);
+
+      interface ArtifactFile {
+        abi: ContractAbi;
+        [key: string]: unknown;
+      }
+
+      const data = JSON.parse(text) as ContractAbi | ArtifactFile;
 
       // Handle both raw ABI arrays and artifact objects with an abi field
-      const abi = Array.isArray(data) ? data : data.abi;
+      const abi: ContractAbi = Array.isArray(data) ? data : data.abi;
 
       if (!abi || !Array.isArray(abi)) {
         setError('Invalid ABI file format');

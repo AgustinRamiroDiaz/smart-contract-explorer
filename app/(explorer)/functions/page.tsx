@@ -14,14 +14,7 @@ import {
 import FunctionCard from '@/app/components/FunctionCard';
 import { genlayerTestnet } from '@/app/wagmi';
 import { useContract } from '@/app/context/ContractContext';
-
-type AbiFunction = {
-  name: string;
-  type: string;
-  stateMutability: string;
-  inputs: any[];
-  outputs: any[];
-};
+import type { AbiFunction } from '@/app/types';
 
 // Generate function signature for unique keys
 function generateFunctionSignature(func: AbiFunction): string {
@@ -55,7 +48,7 @@ function FunctionsPageContent() {
 
   // Get all functions from ABI
   const allFunctions: AbiFunction[] = contractAbi
-    ? contractAbi.filter((item: any) => item.type === 'function')
+    ? contractAbi.filter((item): item is AbiFunction => item.type === 'function')
     : [];
 
   // Separate read and write functions

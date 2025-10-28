@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPublicClient, http, decodeEventLog, parseAbiItem } from 'viem';
+import { createPublicClient, http, decodeEventLog, parseAbiItem, Hash } from 'viem';
+import type { Chain } from 'viem';
 import {
   Box,
   Text,
@@ -22,27 +23,27 @@ import {
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
-
-interface EventLogsExplorerProps {
-  contractAddress: string;
-  contractAbi: any[];
-  chain: any;
-}
+import type { EventLogsExplorerProps, DecodedEventLog, SerializableValue, AbiEvent } from '../types';
 
 // Utility function to convert BigInts to strings for JSON display
-function serializeBigInts(obj: any): any {
+function serializeBigInts(obj: unknown): SerializableValue {
   if (typeof obj === 'bigint') {
     return obj.toString();
   }
   if (Array.isArray(obj)) {
-    return obj.map(serializeBigInts);
+    return obj.map(serializeBigInts) as SerializableValue[];
   }
   if (obj !== null && typeof obj === 'object') {
-    return Object.fromEntries(
-      Object.entries(obj).map(([key, value]) => [key, serializeBigInts(value)])
-    );
+    const result: Record<string, SerializableValue> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = serializeBigInts(value);
+    }
+    return result;
   }
-  return obj;
+  if (obj === null || typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') {
+    return obj;
+  }
+  return String(obj);
 }
 
 export default function EventLogsExplorer({
@@ -50,17 +51,17 @@ export default function EventLogsExplorer({
   contractAbi,
   chain
 }: EventLogsExplorerProps) {
-  const [selectedEvent, setSelectedEvent] = useState('');
-  const [fromBlock, setFromBlock] = useState('');
-  const [toBlock, setToBlock] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [fromBlock, setFromBlock] = useState<string>('');
+  const [toBlock, setToBlock] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<DecodedEventLog[]>([]);
   const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({});
-  const [fetchingBlockNumber, setFetchingBlockNumber] = useState(false);
+  const [fetchingBlockNumber, setFetchingBlockNumber] = useState<boolean>(false);
 
   // Get all events from ABI
-  const events = contractAbi.filter((item: any) => item.type === 'event');
+  const events = contractAbi.filter((item): item is AbiEvent => item.type === 'event');
 
   // Fetch the latest block number when component mounts
   useEffect(() => {
@@ -107,13 +108,20 @@ export default function EventLogsExplorer({
       });
 
       // Find the selected event in the ABI
-      const selectedEventAbi = events.find((e: any) => e.name === selectedEvent);
+      const selectedEventAbi = events.find((e) => e.name === selectedEvent);
       if (!selectedEventAbi) {
         throw new Error('Event not found in ABI');
       }
 
+      interface FilterParams {
+        address: `0x${string}`;
+        event: AbiEvent;
+        fromBlock?: bigint;
+        toBlock?: bigint;
+      }
+
       // Build the filter parameters
-      const filterParams: any = {
+      const filterParams: FilterParams = {
         address: contractAddress as `0x${string}`,
         event: selectedEventAbi,
       };
@@ -142,13 +150,13 @@ export default function EventLogsExplorer({
       }
 
       // Decode the logs
-      const decodedLogs = fetchedLogs.map((log: any, index: number) => {
+      const decodedLogs: DecodedEventLog[] = fetchedLogs.map((log, index: number) => {
         try {
           const decoded = decodeEventLog({
             abi: [selectedEventAbi],
             data: log.data,
             topics: log.topics,
-          }) as { eventName: string; args: any };
+          });
 
           return {
             index,
@@ -157,7 +165,7 @@ export default function EventLogsExplorer({
             logIndex: log.logIndex,
             address: log.address,
             eventName: decoded.eventName,
-            args: decoded.args,
+            args: decoded.args as Record<string, unknown>,
             decoded: true,
           };
         } catch (err) {
@@ -167,7 +175,7 @@ export default function EventLogsExplorer({
             transactionHash: log.transactionHash,
             logIndex: log.logIndex,
             address: log.address,
-            topics: log.topics,
+            topics: log.topics as Hash[],
             data: log.data,
             error: 'Failed to decode log',
             decoded: false,
@@ -224,9 +232,9 @@ export default function EventLogsExplorer({
                 onChange={(e) => setSelectedEvent(e.target.value)}
               >
                 <option value="">-- Select an event --</option>
-                {events.map((event: any) => (
+                {events.map((event) => (
                   <option key={event.name} value={event.name}>
-                    {event.name}({event.inputs?.map((input: any) => `${input.type} ${input.name}`).join(', ')})
+                    {event.name}({event.inputs?.map((input) => `${input.type} ${input.name}`).join(', ')})
                   </option>
                 ))}
               </NativeSelectField>

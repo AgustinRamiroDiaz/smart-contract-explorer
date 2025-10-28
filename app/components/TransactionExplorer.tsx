@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPublicClient, http, decodeFunctionData, decodeEventLog } from 'viem';
+import { createPublicClient, http, decodeFunctionData, decodeEventLog, Transaction, TransactionReceipt, Hash } from 'viem';
+import type { Chain } from 'viem';
 import {
   Box,
   Text,
@@ -18,39 +19,40 @@ import {
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
-
-interface TransactionExplorerProps {
-  contractAbi: any[];
-  chain: any;
-}
+import type { TransactionExplorerProps, DecodedEventLog, DecodedFunctionData, ContractAbi, SerializableValue, AbiFunction, AbiEvent } from '../types';
 
 // Utility function to convert BigInts to strings for JSON display
-function serializeBigInts(obj: any): any {
+function serializeBigInts(obj: unknown): SerializableValue {
   if (typeof obj === 'bigint') {
     return obj.toString();
   }
   if (Array.isArray(obj)) {
-    return obj.map(serializeBigInts);
+    return obj.map(serializeBigInts) as SerializableValue[];
   }
   if (obj !== null && typeof obj === 'object') {
-    return Object.fromEntries(
-      Object.entries(obj).map(([key, value]) => [key, serializeBigInts(value)])
-    );
+    const result: Record<string, SerializableValue> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = serializeBigInts(value);
+    }
+    return result;
   }
-  return obj;
+  if (obj === null || typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') {
+    return obj;
+  }
+  return String(obj);
 }
 
 export default function TransactionExplorer({
   contractAbi,
   chain
 }: TransactionExplorerProps) {
-  const [txHash, setTxHash] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [txHash, setTxHash] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [transactionData, setTransactionData] = useState<any>(null);
-  const [receiptData, setReceiptData] = useState<any>(null);
-  const [decodedInput, setDecodedInput] = useState<any>(null);
-  const [decodedEvents, setDecodedEvents] = useState<any[]>([]);
+  const [transactionData, setTransactionData] = useState<Transaction | null>(null);
+  const [receiptData, setReceiptData] = useState<TransactionReceipt | null>(null);
+  const [decodedInput, setDecodedInput] = useState<DecodedFunctionData | { error: string } | null>(null);
+  const [decodedEvents, setDecodedEvents] = useState<DecodedEventLog[]>([]);
   const [lastFetchedHash, setLastFetchedHash] = useState<string>('');
   const [expandedEvents, setExpandedEvents] = useState<Record<number, boolean>>({});
 
@@ -101,12 +103,13 @@ export default function TransactionExplorer({
 
           // Find the matching function in the ABI to get full signature
           const matchingFunction = contractAbi.find(
-            (item: any) => item.type === 'function' && item.name === decoded.functionName
+            (item): item is AbiFunction => item.type === 'function' && item.name === decoded.functionName
           );
 
           setDecodedInput({
-            ...decoded,
-            signature: matchingFunction ? `${matchingFunction.name}(${matchingFunction.inputs.map((input: any) => `${input.type} ${input.name}`).join(', ')})` : decoded.functionName
+            functionName: decoded.functionName,
+            args: decoded.args || [],
+            signature: matchingFunction ? `${matchingFunction.name}(${matchingFunction.inputs.map((input) => `${input.type} ${input.name}`).join(', ')})` : decoded.functionName
           });
         } catch (err) {
           console.error('Failed to decode input:', err);
@@ -116,13 +119,13 @@ export default function TransactionExplorer({
 
       // Decode events/logs
       if (receipt.logs && receipt.logs.length > 0) {
-        const decodedLogs = receipt.logs.map((log: any, index: number) => {
+        const decodedLogs: DecodedEventLog[] = receipt.logs.map((log, index: number) => {
           try {
             // Try to decode each log with the ABI
             const topics = log.topics;
             if (topics && topics.length > 0) {
               // Find the matching event in the ABI
-              const events = contractAbi.filter((item: any) => item.type === 'event');
+              const events = contractAbi.filter((item): item is AbiEvent => item.type === 'event');
 
               for (const event of events) {
                 try {
@@ -130,12 +133,15 @@ export default function TransactionExplorer({
                     abi: [event],
                     data: log.data,
                     topics: topics,
-                  }) as { eventName: string; args: any };
+                  });
                   return {
                     index,
+                    blockNumber: log.blockNumber,
+                    transactionHash: log.transactionHash,
+                    logIndex: log.logIndex,
                     address: log.address,
                     eventName: decoded.eventName,
-                    args: decoded.args,
+                    args: decoded.args as Record<string, unknown>,
                     decoded: true,
                   };
                 } catch {
@@ -149,7 +155,7 @@ export default function TransactionExplorer({
             return {
               index,
               address: log.address,
-              topics: log.topics,
+              topics: log.topics as Hash[],
               data: log.data,
               decoded: false,
             };
@@ -303,10 +309,10 @@ export default function TransactionExplorer({
             <Box layerStyle="card">
               <Box layerStyle="cardSection">
                 <Heading size="md" mb={4}>Decoded Input</Heading>
-                {decodedInput.error ? (
+                {'error' in decodedInput ? (
                   <Alert.Root status="warning" borderRadius="md">
                     <Alert.Indicator />
-                    <Alert.Title textStyle="label">{decodedInput.error}</Alert.Title>
+                    <Alert.Title textStyle="label">{('error' in decodedInput) && decodedInput.error}</Alert.Title>
                   </Alert.Root>
                 ) : (
                   <VStack gap={3} align="stretch">
