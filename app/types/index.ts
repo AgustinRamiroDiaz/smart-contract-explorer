@@ -104,7 +104,6 @@ export type ReceiptData = TransactionReceipt;
 // ============================================================================
 
 export interface TransactionExplorerProps {
-  contractAbi: ContractAbi;
   chain: Chain;
 }
 
