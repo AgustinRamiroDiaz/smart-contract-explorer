@@ -15,6 +15,8 @@ import {
   Center,
   Collapsible,
   Grid,
+  NativeSelectRoot,
+  NativeSelectField,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
@@ -49,7 +51,8 @@ export default function TransactionExplorer({
     deploymentsFile,
     selectedNetwork,
     selectedDeployment,
-    abisFolderHandle
+    abisFolderHandle,
+    availableAbis
   } = useContract();
 
   const [txHash, setTxHash] = useState<string>('');
@@ -61,9 +64,21 @@ export default function TransactionExplorer({
   const [decodedEvents, setDecodedEvents] = useState<DecodedEventLog[]>([]);
   const [lastFetchedHash, setLastFetchedHash] = useState<string>('');
   const [expandedEvents, setExpandedEvents] = useState<Record<number, boolean>>({});
-  const [inferredContract, setInferredContract] = useState<string | null>(null);
-  const [inferredAbi, setInferredAbi] = useState<ContractAbi | null>(null);
+  const [selectedContract, setSelectedContract] = useState<string>('');
+  const [contractAbi, setContractAbi] = useState<ContractAbi | null>(null);
   const [loadingAbi, setLoadingAbi] = useState<boolean>(false);
+  const [wasAutoInferred, setWasAutoInferred] = useState<boolean>(false);
+
+  // Get available contracts from the current deployment that have ABIs
+  const availableContracts = selectedNetwork && selectedDeployment
+    ? Object.keys(deploymentsFile[selectedNetwork]?.[selectedDeployment] || {}).filter(
+        (key) => {
+          const hasAddress = deploymentsFile[selectedNetwork][selectedDeployment][key]?.startsWith('0x');
+          const hasAbi = availableAbis.has(key);
+          return hasAddress && hasAbi;
+        }
+      )
+    : [];
 
   // Helper function to find a contract by its address in the current deployment
   const findContractByAddress = (address: string): string | null => {
@@ -84,7 +99,7 @@ export default function TransactionExplorer({
   };
 
   // Load ABI for a specific contract from the ABIs folder
-  const loadAbiForContract = async (contractName: string) => {
+  const loadAbiForContract = async (contractName: string, isAutoInferred: boolean = false) => {
     if (!abisFolderHandle) {
       console.warn('No ABIs folder handle available');
       return null;
@@ -118,6 +133,124 @@ export default function TransactionExplorer({
       return null;
     } finally {
       setLoadingAbi(false);
+    }
+  };
+
+  // Handle manual contract selection from dropdown
+  const handleContractChange = async (contractName: string) => {
+    setSelectedContract(contractName);
+    setWasAutoInferred(false);
+
+    if (!contractName) {
+      setContractAbi(null);
+      setDecodedInput(null);
+      setDecodedEvents([]);
+      return;
+    }
+
+    // Load the ABI for the selected contract
+    const abi = await loadAbiForContract(contractName, false);
+    if (abi) {
+      setContractAbi(abi);
+
+      // Re-decode the transaction if one is loaded
+      if (transactionData && receiptData) {
+        await decodeTransactionWithAbi(transactionData, receiptData, abi);
+      }
+
+      toaster.success({
+        title: 'Contract loaded',
+        description: `Loaded ABI for ${contractName}`,
+      });
+    } else {
+      setContractAbi(null);
+      toaster.error({
+        title: 'Failed to load ABI',
+        description: `Could not load ABI for ${contractName}`,
+      });
+    }
+  };
+
+  // Decode transaction with a given ABI
+  const decodeTransactionWithAbi = async (transaction: Transaction, receipt: TransactionReceipt, abi: ContractAbi) => {
+    // Decode transaction input
+    if (transaction.input && transaction.input !== '0x') {
+      try {
+        const decoded = decodeFunctionData({
+          abi: abi,
+          data: transaction.input,
+        });
+
+        const matchingFunction = abi.find(
+          (item): item is AbiFunction => item.type === 'function' && item.name === decoded.functionName
+        );
+
+        setDecodedInput({
+          functionName: decoded.functionName,
+          args: decoded.args || [],
+          signature: matchingFunction ? `${matchingFunction.name}(${matchingFunction.inputs.map((input) => `${input.type} ${input.name}`).join(', ')})` : decoded.functionName
+        });
+      } catch (err) {
+        console.error('Failed to decode input:', err);
+        setDecodedInput({ error: 'Failed to decode input data. The ABI might not match this transaction.' });
+      }
+    }
+
+    // Decode events/logs
+    if (receipt.logs && receipt.logs.length > 0) {
+      const decodedLogs: DecodedEventLog[] = receipt.logs.map((log, index: number) => {
+        try {
+          const topics = log.topics;
+          if (topics && topics.length > 0) {
+            const events = abi.filter((item): item is AbiEvent => item.type === 'event');
+
+            for (const event of events) {
+              try {
+                const decoded = decodeEventLog({
+                  abi: [event],
+                  data: log.data,
+                  topics: topics,
+                });
+                return {
+                  index,
+                  blockNumber: log.blockNumber,
+                  transactionHash: log.transactionHash,
+                  logIndex: log.logIndex,
+                  address: log.address,
+                  eventName: decoded.eventName,
+                  args: decoded.args as Record<string, unknown>,
+                  decoded: true,
+                };
+              } catch {
+                continue;
+              }
+            }
+          }
+
+          return {
+            index,
+            address: log.address,
+            topics: log.topics as Hash[],
+            data: log.data,
+            decoded: false,
+          };
+        } catch (err) {
+          return {
+            index,
+            address: log.address,
+            error: 'Failed to decode log',
+            decoded: false,
+          };
+        }
+      });
+
+      setDecodedEvents(decodedLogs);
+
+      const initialExpandedState: Record<number, boolean> = {};
+      decodedLogs.forEach((event) => {
+        initialExpandedState[event.index] = event.decoded;
+      });
+      setExpandedEvents(initialExpandedState);
     }
   };
 
@@ -163,116 +296,39 @@ export default function TransactionExplorer({
       if (transaction.to) {
         const matchingContract = findContractByAddress(transaction.to);
         if (matchingContract) {
-          setInferredContract(matchingContract);
+          setSelectedContract(matchingContract);
+          setWasAutoInferred(true);
 
           // Load the ABI for the matched contract
-          const abi = await loadAbiForContract(matchingContract);
+          const abi = await loadAbiForContract(matchingContract, true);
           if (abi) {
-            setInferredAbi(abi);
-
-            // Decode transaction input with loaded ABI
-            if (transaction.input && transaction.input !== '0x') {
-              try {
-                const decoded = decodeFunctionData({
-                  abi: abi,
-                  data: transaction.input,
-                });
-
-                const matchingFunction = abi.find(
-                  (item): item is AbiFunction => item.type === 'function' && item.name === decoded.functionName
-                );
-
-                setDecodedInput({
-                  functionName: decoded.functionName,
-                  args: decoded.args || [],
-                  signature: matchingFunction ? `${matchingFunction.name}(${matchingFunction.inputs.map((input) => `${input.type} ${input.name}`).join(', ')})` : decoded.functionName
-                });
-              } catch (err) {
-                console.error('Failed to decode input:', err);
-                setDecodedInput({ error: 'Failed to decode input data. The ABI might not match this transaction.' });
-              }
-            }
-
-            // Decode events/logs with loaded ABI
-            if (receipt.logs && receipt.logs.length > 0) {
-              const decodedLogs: DecodedEventLog[] = receipt.logs.map((log, index: number) => {
-                try {
-                  const topics = log.topics;
-                  if (topics && topics.length > 0) {
-                    const events = abi.filter((item): item is AbiEvent => item.type === 'event');
-
-                    for (const event of events) {
-                      try {
-                        const decoded = decodeEventLog({
-                          abi: [event],
-                          data: log.data,
-                          topics: topics,
-                        });
-                        return {
-                          index,
-                          blockNumber: log.blockNumber,
-                          transactionHash: log.transactionHash,
-                          logIndex: log.logIndex,
-                          address: log.address,
-                          eventName: decoded.eventName,
-                          args: decoded.args as Record<string, unknown>,
-                          decoded: true,
-                        };
-                      } catch {
-                        continue;
-                      }
-                    }
-                  }
-
-                  return {
-                    index,
-                    address: log.address,
-                    topics: log.topics as Hash[],
-                    data: log.data,
-                    decoded: false,
-                  };
-                } catch (err) {
-                  return {
-                    index,
-                    address: log.address,
-                    error: 'Failed to decode log',
-                    decoded: false,
-                  };
-                }
-              });
-
-              setDecodedEvents(decodedLogs);
-
-              const initialExpandedState: Record<number, boolean> = {};
-              decodedLogs.forEach((event) => {
-                initialExpandedState[event.index] = event.decoded;
-              });
-              setExpandedEvents(initialExpandedState);
-            }
+            setContractAbi(abi);
+            await decodeTransactionWithAbi(transaction, receipt, abi);
 
             toaster.success({
               title: 'Transaction loaded',
               description: `Auto-loaded contract: ${matchingContract}`,
             });
           } else {
-            setInferredContract(null);
-            setInferredAbi(null);
+            setContractAbi(null);
             toaster.warning({
               title: 'Transaction loaded',
               description: `Found contract ${matchingContract} but failed to load ABI`,
             });
           }
         } else {
-          setInferredContract(null);
-          setInferredAbi(null);
+          setSelectedContract('');
+          setContractAbi(null);
+          setWasAutoInferred(false);
           toaster.info({
             title: 'Transaction loaded',
             description: 'Contract address not found in deployment',
           });
         }
       } else {
-        setInferredContract(null);
-        setInferredAbi(null);
+        setSelectedContract('');
+        setContractAbi(null);
+        setWasAutoInferred(false);
         toaster.success({
           title: 'Transaction loaded',
           description: 'Transaction details fetched successfully',
@@ -338,23 +394,48 @@ export default function TransactionExplorer({
                 )}
               </Field.HelperText>
             </Box>
-            <Box pt={2}>
-              {inferredContract ? (
-                <HStack gap={2} px={3} py={2} bg="blue.subtle" borderRadius="md" borderWidth="1px" borderColor="blue.muted">
-                  <Text fontSize="sm" fontWeight="semibold" color="blue.fg">
-                    Contract:
+            <Box minW="300px">
+              <Field.Root>
+                <Field.Label fontSize="sm" fontWeight="semibold">
+                  Contract:
+                  {wasAutoInferred && selectedContract && (
+                    <Text as="span" ml={2} fontSize="xs" color="blue.fg" fontWeight="normal">
+                      (auto-detected)
+                    </Text>
+                  )}
+                  {loadingAbi && (
+                    <Text as="span" ml={2} fontSize="xs" color="gray.500" fontWeight="normal">
+                      (loading...)
+                    </Text>
+                  )}
+                </Field.Label>
+                <NativeSelectRoot size="sm" disabled={loadingAbi || !selectedNetwork || !selectedDeployment}>
+                  <NativeSelectField
+                    value={selectedContract}
+                    onChange={(e) => handleContractChange(e.target.value)}
+                    bg={{ base: 'white' }}
+                    _dark={{ bg: 'gray.800' }}
+                  >
+                    <option value="">
+                      {!selectedNetwork || !selectedDeployment
+                        ? 'Select network/deployment first'
+                        : availableContracts.length === 0
+                        ? 'No contracts available'
+                        : '-- Select a contract --'}
+                    </option>
+                    {availableContracts.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </NativeSelectField>
+                </NativeSelectRoot>
+                {!loadingAbi && availableContracts.length > 0 && !selectedContract && (
+                  <Text fontSize="xs" color="gray.600" mt={1}>
+                    {availableContracts.length} contract{availableContracts.length !== 1 ? 's' : ''} available
                   </Text>
-                  <Code layerStyle="codeInline" fontSize="sm" bg="transparent">
-                    {inferredContract}
-                  </Code>
-                </HStack>
-              ) : (
-                <HStack gap={2} px={3} py={2} bg="gray.subtle" borderRadius="md" borderWidth="1px" borderColor="gray.muted">
-                  <Text fontSize="sm" color="gray.fg">
-                    No transaction loaded
-                  </Text>
-                </HStack>
-              )}
+                )}
+              </Field.Root>
             </Box>
           </Grid>
         </Field.Root>
@@ -579,7 +660,7 @@ export default function TransactionExplorer({
               Enter a transaction hash to explore
             </Text>
             <Text color="fg.subtle" fontSize="sm">
-              The transaction will be decoded using the selected ABI from the sidebar
+              The contract will be auto-detected from the transaction, or you can select one manually
             </Text>
           </VStack>
         </Center>

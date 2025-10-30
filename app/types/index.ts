@@ -2,7 +2,7 @@
  * Shared TypeScript types for the Contract Explorer application
  */
 
-import { Chain, Hash, TransactionReceipt, Transaction, Log } from 'viem';
+import { Chain, Hash, TransactionReceipt, Transaction } from 'viem';
 
 // ============================================================================
 // ABI Types
