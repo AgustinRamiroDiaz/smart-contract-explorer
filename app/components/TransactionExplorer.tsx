@@ -638,14 +638,99 @@ export default function TransactionExplorer({
             </Box>
           )}
 
-          {/* No Events */}
+          {/* No Events or Raw Logs */}
           {receiptData && decodedEvents.length === 0 && (
             <Box layerStyle="card">
               <Box layerStyle="cardSection">
-                <Heading size="md" mb={2}>Events</Heading>
-                <Text fontSize="sm" color="fg.muted">
-                  No events were emitted in this transaction
-                </Text>
+                <Heading size="md" mb={4}>Events</Heading>
+                {receiptData.logs && receiptData.logs.length > 0 ? (
+                  <VStack gap={4} align="stretch">
+                    <Alert.Root status="info" borderRadius="md">
+                      <Alert.Indicator />
+                      <Alert.Title textStyle="label">
+                        Showing raw logs. Select a contract to decode events.
+                      </Alert.Title>
+                    </Alert.Root>
+                    {receiptData.logs.map((log, index) => {
+                      const isExpanded = expandedEvents[index] ?? false;
+                      return (
+                        <Box key={index} layerStyle="card">
+                          {/* Log Header */}
+                          <HStack
+                            as="button"
+                            onClick={() => toggleEvent(index)}
+                            onKeyDown={(e) => handleEventKeyDown(e, index)}
+                            p={3}
+                            bg="header.bg"
+                            cursor="pointer"
+                            userSelect="none"
+                            _hover={{ bg: 'header.hover' }}
+                            _focus={{ outline: '2px solid', outlineColor: 'blue.solid', outlineOffset: '-2px' }}
+                            width="full"
+                            textAlign="left"
+                            transition="all 0.2s"
+                            tabIndex={0}
+                            aria-expanded={isExpanded}
+                            aria-label={`Raw Log ${index + 1}`}
+                          >
+                            <Text fontSize="lg">{isExpanded ? '▼' : '▶'}</Text>
+                            <VStack align="start" flex={1} gap={1}>
+                              <Text fontWeight="bold" fontFamily="mono" fontSize="sm">
+                                Log #{index + 1}
+                              </Text>
+                            </VStack>
+                            <Text fontSize="xs" color="orange.solid" fontWeight="semibold">⚠ Raw Log</Text>
+                          </HStack>
+
+                          {/* Expandable Content */}
+                          <Collapsible.Root open={isExpanded}>
+                            <Collapsible.Content>
+                              <Box layerStyle="cardSection">
+                                <VStack gap={3} align="stretch">
+                                  <Box>
+                                    <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted">Address:</Text>
+                                    <Code layerStyle="codeInline" display="block" mt={1} whiteSpace="pre-wrap" wordBreak="break-all">
+                                      {log.address}
+                                    </Code>
+                                  </Box>
+
+                                  {log.topics && log.topics.length > 0 && (
+                                    <Box>
+                                      <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted" mb={1}>Topics:</Text>
+                                      <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
+                                        {JSON.stringify(log.topics, null, 2)}
+                                      </Code>
+                                    </Box>
+                                  )}
+
+                                  {log.data && log.data !== '0x' && (
+                                    <Box>
+                                      <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted" mb={1}>Data:</Text>
+                                      <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
+                                        {log.data}
+                                      </Code>
+                                    </Box>
+                                  )}
+
+                                  <Box>
+                                    <Text textStyle="monoCode" fontWeight="semibold" color="fg.muted">Log Index:</Text>
+                                    <Code layerStyle="codeInline" display="block" mt={1}>
+                                      {log.logIndex?.toString() || 'N/A'}
+                                    </Code>
+                                  </Box>
+                                </VStack>
+                              </Box>
+                            </Collapsible.Content>
+                          </Collapsible.Root>
+                        </Box>
+                      );
+                    })}
+                  </VStack>
+                ) : (
+                  <Text fontSize="sm" color="fg.muted">
+                    No events were emitted in this transaction
+                  </Text>
+                )}
               </Box>
             </Box>
           )}
