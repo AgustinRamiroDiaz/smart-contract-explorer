@@ -20,9 +20,13 @@ import {
   NativeSelectField,
   Grid,
   Spinner,
+  Dialog,
+  Portal,
+  IconButton,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
+import { LuCopy } from 'react-icons/lu';
 import type { EventLogsExplorerProps, DecodedEventLog, SerializableValue, AbiEvent } from '../types';
 
 // Utility function to convert BigInts to strings for JSON display
@@ -46,6 +50,44 @@ function serializeBigInts(obj: unknown): SerializableValue {
   return String(obj);
 }
 
+// Generate event signature for CLI commands
+function generateEventSignature(event: AbiEvent): string {
+  const paramTypes = event.inputs?.map(input => input.type).join(',') || '';
+  return `${event.name}(${paramTypes})`;
+}
+
+// Generate Foundry cast logs command
+function generateFoundryCommand(
+  event: AbiEvent,
+  contractAddress: string,
+  fromBlock?: string,
+  toBlock?: string,
+  rpcUrl?: string
+): string {
+  const signature = generateEventSignature(event);
+  const fromBlockFlag = fromBlock && fromBlock.trim() !== '' ? ` --from-block ${fromBlock}` : '';
+  const toBlockFlag = toBlock && toBlock.trim() !== '' ? ` --to-block ${toBlock}` : '';
+  const rpcUrlValue = rpcUrl || '$RPC_URL';
+
+  return `cast logs --address ${contractAddress} "${signature}"${fromBlockFlag}${toBlockFlag} --rpc-url ${rpcUrlValue}`;
+}
+
+// Generate ZKsync CLI command for event logs
+function generateZksyncCommand(
+  event: AbiEvent,
+  contractAddress: string,
+  fromBlock?: string,
+  toBlock?: string,
+  chainNetwork?: string
+): string {
+  const signature = generateEventSignature(event);
+  const fromBlockFlag = fromBlock && fromBlock.trim() !== '' ? ` --from-block ${fromBlock}` : '';
+  const toBlockFlag = toBlock && toBlock.trim() !== '' ? ` --to-block ${toBlock}` : '';
+  const chainValue = chainNetwork || 'zksync-sepolia';
+
+  return `npx zksync-cli contract logs --chain "${chainValue}" --contract "${contractAddress}" --event "${signature}"${fromBlockFlag}${toBlockFlag}`;
+}
+
 export default function EventLogsExplorer({
   contractAddress,
   contractAbi,
@@ -59,6 +101,7 @@ export default function EventLogsExplorer({
   const [logs, setLogs] = useState<DecodedEventLog[]>([]);
   const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({});
   const [fetchingBlockNumber, setFetchingBlockNumber] = useState<boolean>(false);
+  const [isCommandsModalOpen, setIsCommandsModalOpen] = useState<boolean>(false);
 
   // Get all events from ABI
   const events = contractAbi.filter((item): item is AbiEvent => item.type === 'event');
@@ -217,6 +260,30 @@ export default function EventLogsExplorer({
     }
   };
 
+  const copyCommand = async (type: 'foundry' | 'zksync') => {
+    const selectedEventAbi = events.find((e) => e.name === selectedEvent);
+    if (!selectedEventAbi) return;
+
+    const rpcUrl: string | undefined = chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0];
+    const chainNetwork: string | undefined = 'network' in chain ? (chain.network as string) : undefined;
+    const command = type === 'foundry'
+      ? generateFoundryCommand(selectedEventAbi, contractAddress, fromBlock, toBlock, rpcUrl)
+      : generateZksyncCommand(selectedEventAbi, contractAddress, fromBlock, toBlock, chainNetwork);
+
+    try {
+      await navigator.clipboard.writeText(command);
+      toaster.success({
+        title: 'Command copied',
+        description: `${type === 'foundry' ? 'Foundry' : 'ZKsync CLI'} command copied to clipboard`,
+      });
+    } catch (err) {
+      toaster.error({
+        title: 'Failed to copy',
+        description: 'Could not copy command to clipboard',
+      });
+    }
+  };
+
   return (
     <VStack gap={6} align="stretch">
       {/* Search Form */}
@@ -279,17 +346,26 @@ export default function EventLogsExplorer({
             </Field.Root>
           </Grid>
 
-          {/* Search Button */}
-          <Button
-            onClick={handleSearch}
-            colorScheme="blue"
-            loading={loading}
-            loadingText="Searching..."
-            disabled={!selectedEvent || !contractAddress}
-            width="full"
-          >
-            Search Logs
-          </Button>
+          {/* Search Button and CLI Commands */}
+          <HStack gap={2}>
+            <Button
+              onClick={handleSearch}
+              colorScheme="blue"
+              loading={loading}
+              loadingText="Searching..."
+              disabled={!selectedEvent || !contractAddress}
+              flex="1"
+            >
+              Search Logs
+            </Button>
+            <Button
+              onClick={() => setIsCommandsModalOpen(true)}
+              variant="outline"
+              disabled={!selectedEvent || !contractAddress}
+            >
+              CLI Commands
+            </Button>
+          </HStack>
         </VStack>
       </Box>
 
@@ -463,6 +539,90 @@ export default function EventLogsExplorer({
           </VStack>
         </Center>
       )}
+
+      {/* Commands Modal */}
+      <Dialog.Root open={isCommandsModalOpen} onOpenChange={(e) => setIsCommandsModalOpen(e.open)}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content maxW="4xl">
+              <Dialog.Header>
+                <Dialog.Title>CLI Commands for Event Logs</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.CloseTrigger />
+              <Dialog.Body>
+                {selectedEvent && events.find((e) => e.name === selectedEvent) ? (
+                  <VStack gap={4} align="stretch">
+                    {/* Foundry Command */}
+                    <Box>
+                      <Text fontWeight="bold" mb={2}>Foundry Cast Logs Command</Text>
+                      <HStack gap={2} align="start">
+                        <Code
+                          layerStyle="codeBlock"
+                          flex="1"
+                          display="block"
+                          whiteSpace="pre-wrap"
+                          wordBreak="break-all"
+                          p={3}
+                        >
+                          {generateFoundryCommand(
+                            events.find((e) => e.name === selectedEvent)!,
+                            contractAddress,
+                            fromBlock,
+                            toBlock,
+                            chain.rpcUrls?.default?.http?.[0] || chain.rpcUrls?.public?.http?.[0]
+                          )}
+                        </Code>
+                        <IconButton
+                          aria-label="Copy Foundry command"
+                          onClick={() => copyCommand('foundry')}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          <LuCopy />
+                        </IconButton>
+                      </HStack>
+                    </Box>
+
+                    {/* ZKsync Command */}
+                    <Box>
+                      <Text fontWeight="bold" mb={2}>ZKsync CLI Logs Command</Text>
+                      <HStack gap={2} align="start">
+                        <Code
+                          layerStyle="codeBlock"
+                          flex="1"
+                          display="block"
+                          whiteSpace="pre-wrap"
+                          wordBreak="break-all"
+                          p={3}
+                        >
+                          {generateZksyncCommand(
+                            events.find((e) => e.name === selectedEvent)!,
+                            contractAddress,
+                            fromBlock,
+                            toBlock,
+                            'network' in chain ? (chain.network as string) : undefined
+                          )}
+                        </Code>
+                        <IconButton
+                          aria-label="Copy ZKsync command"
+                          onClick={() => copyCommand('zksync')}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          <LuCopy />
+                        </IconButton>
+                      </HStack>
+                    </Box>
+                  </VStack>
+                ) : (
+                  <Text color="fg.muted">Please select an event to see CLI commands</Text>
+                )}
+              </Dialog.Body>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
     </VStack>
   );
 }
