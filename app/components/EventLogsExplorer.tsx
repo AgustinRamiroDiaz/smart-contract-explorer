@@ -16,14 +16,20 @@ import {
   Center,
   Collapsible,
   Button,
-  NativeSelectRoot,
-  NativeSelectField,
   Grid,
   Spinner,
   Dialog,
   Portal,
   IconButton,
+  createListCollection,
 } from '@chakra-ui/react';
+import {
+  ComboboxContent,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxLabel,
+  ComboboxRoot,
+} from '@/components/ui/combobox';
 import { JsonEditor } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
 import { LuCopy } from 'react-icons/lu';
@@ -94,6 +100,7 @@ export default function EventLogsExplorer({
   chain
 }: EventLogsExplorerProps) {
   const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [inputValue, setInputValue] = useState<string>('');
   const [fromBlock, setFromBlock] = useState<string>('');
   const [toBlock, setToBlock] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -105,6 +112,27 @@ export default function EventLogsExplorer({
 
   // Get all events from ABI
   const events = contractAbi.filter((item): item is AbiEvent => item.type === 'event');
+
+  // Create collection for Combobox component
+  const allEventItems = events.map((event) => ({
+    label: `${event.name}(${event.inputs?.map((input) => `${input.type} ${input.name}`).join(', ')})`,
+    value: event.name,
+  }));
+
+  // Filter items based on input value
+  // Show all items if no input or if input exactly matches the selected event
+  const selectedItemLabel = allEventItems.find(item => item.value === selectedEvent)?.label;
+  const shouldFilter = inputValue && inputValue !== selectedItemLabel;
+
+  const filteredEventItems = shouldFilter
+    ? allEventItems.filter((item) =>
+        item.label.toLowerCase().includes(inputValue.toLowerCase())
+      )
+    : allEventItems;
+
+  const eventCollection = createListCollection({
+    items: filteredEventItems,
+  });
 
   // Fetch the latest block number when component mounts
   useEffect(() => {
@@ -293,19 +321,32 @@ export default function EventLogsExplorer({
           {/* Event Selection */}
           <Field.Root>
             <Field.Label fontSize="sm" fontWeight="semibold">Select Event Type:</Field.Label>
-            <NativeSelectRoot size="sm">
-              <NativeSelectField
-                value={selectedEvent}
-                onChange={(e) => setSelectedEvent(e.target.value)}
-              >
-                <option value="">-- Select an event --</option>
-                {events.map((event) => (
-                  <option key={event.name} value={event.name}>
-                    {event.name}({event.inputs?.map((input) => `${input.type} ${input.name}`).join(', ')})
-                  </option>
+            <ComboboxRoot
+              collection={eventCollection}
+              size="sm"
+              value={selectedEvent ? [selectedEvent] : []}
+              onValueChange={(details) => {
+                setSelectedEvent(details.value[0] || '');
+                // Update input value to show selected event
+                const selectedItem = eventCollection.items.find(item => item.value === details.value[0]);
+                if (selectedItem) {
+                  setInputValue(selectedItem.label);
+                }
+              }}
+              inputValue={inputValue}
+              onInputValueChange={(details) => setInputValue(details.inputValue)}
+              openOnClick
+            >
+              <ComboboxLabel>Select an event</ComboboxLabel>
+              <ComboboxInput placeholder="Search or select an event..." clearable />
+              <ComboboxContent>
+                {eventCollection.items.map((event) => (
+                  <ComboboxItem item={event} key={event.value}>
+                    {event.label}
+                  </ComboboxItem>
                 ))}
-              </NativeSelectField>
-            </NativeSelectRoot>
+              </ComboboxContent>
+            </ComboboxRoot>
           </Field.Root>
           {events.length === 0 && (
             <Alert.Root status="info" size="sm" mt={2}>
