@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Box,
   VStack,
@@ -14,11 +15,14 @@ import {
   Alert,
   Center,
   Spinner,
+  IconButton,
 } from '@chakra-ui/react';
 import { Tooltip } from '@chakra-ui/react';
 import { ConnectButton } from '@/app/components/ConnectButton';
 import { ThemeToggle } from '@/components/ui/theme-selector';
 import { useContract } from '@/app/context/ContractContext';
+import { createPublicClient, http } from 'viem';
+import { genlayerTestnet } from '@/app/wagmi';
 
 export default function Sidebar() {
   const {
@@ -42,6 +46,10 @@ export default function Sidebar() {
     abisFolderHandle,
   } = useContract();
 
+  const [currentBlock, setCurrentBlock] = useState<bigint | null>(null);
+  const [isLoadingBlock, setIsLoadingBlock] = useState(false);
+  const [blockCopied, setBlockCopied] = useState(false);
+
   const networkNames = Object.keys(deploymentsFile);
   const deploymentNames = selectedNetwork
     ? Object.keys(deploymentsFile[selectedNetwork] || {})
@@ -55,6 +63,40 @@ export default function Sidebar() {
         }
       )
     : [];
+
+  const fetchCurrentBlock = async () => {
+    try {
+      setIsLoadingBlock(true);
+      const client = createPublicClient({
+        chain: genlayerTestnet,
+        transport: http(),
+      });
+      const blockNumber = await client.getBlockNumber();
+      setCurrentBlock(blockNumber);
+    } catch (err) {
+      console.error('Error fetching current block:', err);
+    } finally {
+      setIsLoadingBlock(false);
+    }
+  };
+
+  const copyBlockNumber = async () => {
+    if (!currentBlock) return;
+    try {
+      await navigator.clipboard.writeText(currentBlock.toString());
+      setBlockCopied(true);
+      setTimeout(() => setBlockCopied(false), 2000);
+    } catch (err) {
+      console.error('Error copying block number:', err);
+    }
+  };
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    fetchCurrentBlock();
+    const interval = setInterval(fetchCurrentBlock, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Box
@@ -348,6 +390,50 @@ export default function Sidebar() {
             <Alert.Title fontSize="xs">{error}</Alert.Title>
           </Alert.Root>
         )}
+
+        {/* Current Block Indicator */}
+        <Box
+          mt="auto"
+          pt={4}
+          borderTopWidth="1px"
+          borderColor="gray.200"
+          _dark={{ borderColor: 'gray.700' }}
+        >
+          <VStack align="stretch" gap={2}>
+            <Text fontSize="xs" color="gray.500" _dark={{ color: 'gray.400' }}>
+              Current Block
+            </Text>
+            <HStack justify="space-between" align="center">
+              {isLoadingBlock && !currentBlock ? (
+                <Spinner size="xs" />
+              ) : (
+                <Text fontSize="sm" fontWeight="semibold" fontFamily="mono">
+                  {currentBlock ? currentBlock.toString() : '—'}
+                </Text>
+              )}
+              <HStack gap={1}>
+                <IconButton
+                  aria-label="Copy block number"
+                  size="xs"
+                  variant="ghost"
+                  onClick={copyBlockNumber}
+                  disabled={!currentBlock}
+                >
+                  <Text fontSize="sm">{blockCopied ? '✓' : '📋'}</Text>
+                </IconButton>
+                <IconButton
+                  aria-label="Refresh block number"
+                  size="xs"
+                  variant="ghost"
+                  onClick={fetchCurrentBlock}
+                  disabled={isLoadingBlock}
+                >
+                  <Text fontSize="sm">{isLoadingBlock ? '⏳' : '🔄'}</Text>
+                </IconButton>
+              </HStack>
+            </HStack>
+          </VStack>
+        </Box>
       </VStack>
     </Box>
   );
