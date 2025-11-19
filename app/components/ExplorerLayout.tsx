@@ -92,6 +92,15 @@ export default function ExplorerLayout({ children }: ExplorerLayoutProps) {
                   Event Logs
                 </Button>
               </Link>
+              <Link href={buildUrlWithParams('/debugger')} passHref>
+                <Button
+                  variant={isActive('/debugger') ? 'solid' : 'ghost'}
+                  colorScheme={isActive('/debugger') ? 'blue' : 'gray'}
+                  size="sm"
+                >
+                  Debugger
+                </Button>
+              </Link>
             </HStack>
           </Box>
 
