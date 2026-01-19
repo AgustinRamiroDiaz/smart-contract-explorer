@@ -83,6 +83,15 @@ export default function ExplorerLayout({ children }: ExplorerLayoutProps) {
                   Transaction Explorer
                 </Button>
               </Link>
+              <Link href={buildUrlWithParams('/blocks')} passHref>
+                <Button
+                  variant={isActive('/blocks') ? 'solid' : 'ghost'}
+                  colorScheme={isActive('/blocks') ? 'blue' : 'gray'}
+                  size="sm"
+                >
+                  Block Explorer
+                </Button>
+              </Link>
               <Link href={buildUrlWithParams('/events')} passHref>
                 <Button
                   variant={isActive('/events') ? 'solid' : 'ghost'}
