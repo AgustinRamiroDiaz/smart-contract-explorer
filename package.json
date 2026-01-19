@@ -12,10 +12,8 @@
   "dependencies": {
     "@chakra-ui/react": "^3.27.1",
     "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
     "@rainbow-me/rainbowkit": "^2.2.8",
     "@tanstack/react-query": "^5.90.2",
-    "framer-motion": "^12.23.22",
     "json-edit-react": "^1.29.0",
     "next": "latest",
     "next-themes": "^0.4.6",
