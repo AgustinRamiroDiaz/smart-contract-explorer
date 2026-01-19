@@ -26,6 +26,7 @@ import { useColorMode } from '@/components/ui/color-mode';
 import { JsonEditor, githubDarkTheme, githubLightTheme } from 'json-edit-react';
 import { toaster } from '@/components/ui/toaster';
 import { validateSolidityType, getPlaceholderForType } from '@/app/utils/validation';
+import { getArgsArray } from '@/app/utils/argumentParser';
 import AddressInput from './AddressInput';
 import { LuCopy } from 'react-icons/lu';
 import type { FunctionCardProps, AbiFunction, SerializableValue, ContractAbi } from '../types';
@@ -224,18 +225,8 @@ export default function FunctionCard({
   };
 
   // Convert args to array in correct order
-  const getArgsArray = (): unknown[] => {
-    return func.inputs.map(input => {
-      const argValue = args[input.name] || '';
-      // Basic type conversion
-      if (input.type.includes('uint') || input.type.includes('int')) {
-        return argValue ? BigInt(argValue) : BigInt(0);
-      }
-      if (input.type === 'bool') {
-        return argValue.toLowerCase() === 'true';
-      }
-      return argValue;
-    });
+  const getArgsArrayForCall = (): unknown[] => {
+    return getArgsArray(func.inputs, args);
   };
 
   const callReadFunction = async () => {
@@ -259,7 +250,7 @@ export default function FunctionCard({
         transport: http(),
       });
 
-      const argsArray = getArgsArray();
+      const argsArray = getArgsArrayForCall();
 
       interface ReadContractParams {
         address: `0x${string}`;
@@ -325,7 +316,7 @@ export default function FunctionCard({
     setResult(null);
 
     try {
-      const argsArray = getArgsArray();
+      const argsArray = getArgsArrayForCall();
 
       interface WriteContractParams {
         address: `0x${string}`;
