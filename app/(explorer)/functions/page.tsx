@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Box,
   VStack,
@@ -12,9 +13,15 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import FunctionCard from '@/app/components/FunctionCard';
-import { genlayerTestnet } from '@/app/wagmi';
+import { genlayerTestnet, mainnet } from '@/app/wagmi';
 import { useContract } from '@/app/context/ContractContext';
 import type { AbiFunction } from '@/app/types';
+
+// Chain lookup for URL parameter support
+const chains = {
+  'genlayer-testnet': genlayerTestnet,
+  'mainnet': mainnet,
+} as const;
 
 // Generate function signature for unique keys
 function generateFunctionSignature(func: AbiFunction): string {
@@ -26,6 +33,11 @@ function FunctionsPageContent() {
   const { contractAbi, contractAddress, loadingAbi } = useContract();
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
+
+  // Get chain from URL parameter or default to genlayerTestnet
+  const chainParam = searchParams?.get('chain') as keyof typeof chains | null;
+  const selectedChain = chainParam && chains[chainParam] ? chains[chainParam] : genlayerTestnet;
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -137,7 +149,7 @@ function FunctionsPageContent() {
                       func={func}
                       contractAddress={contractAddress}
                       contractAbi={contractAbi}
-                      chain={genlayerTestnet}
+                      chain={selectedChain}
                     />
                   ))}
                 </Box>
@@ -156,7 +168,7 @@ function FunctionsPageContent() {
                       func={func}
                       contractAddress={contractAddress}
                       contractAbi={contractAbi}
-                      chain={genlayerTestnet}
+                      chain={selectedChain}
                     />
                   ))}
                 </Box>

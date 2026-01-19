@@ -1,6 +1,10 @@
 import { defineChain } from 'viem'
+import { mainnet } from 'viem/chains'
 import { http, createConfig } from 'wagmi'
 import { injected } from 'wagmi/connectors'
+
+// Re-export mainnet for use in tests
+export { mainnet }
 
 // Define GenLayer Testnet
 export const genlayerTestnet = defineChain({
@@ -29,7 +33,7 @@ export const genlayerTestnet = defineChain({
 })
 
 export const config = createConfig({
-  chains: [genlayerTestnet],
+  chains: [genlayerTestnet, mainnet],
   connectors: [
     injected({
       shimDisconnect: true,
@@ -38,5 +42,6 @@ export const config = createConfig({
   ssr: true,
   transports: {
     [genlayerTestnet.id]: http(),
+    [mainnet.id]: http(),
   },
 })

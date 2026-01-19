@@ -433,6 +433,26 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     loadAbiFromFolder,
   };
 
+  // Expose test helpers for E2E testing
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // @ts-ignore - Expose for E2E testing
+      window.__contractContext = {
+        setContractAddress,
+        setContractAbi,
+        setSelectedNetwork: setSelectedNetworkState,
+        setSelectedDeployment: setSelectedDeploymentState,
+        setSelectedContract: setSelectedContractState,
+      };
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        // @ts-ignore
+        delete window.__contractContext;
+      }
+    };
+  }, []);
+
   return <ContractContext.Provider value={value}>{children}</ContractContext.Provider>;
 }
 
