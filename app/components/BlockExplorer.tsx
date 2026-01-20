@@ -14,43 +14,24 @@ import {
   Grid,
 } from '@chakra-ui/react';
 import { toaster } from '@/components/ui/toaster';
-import { useContract } from '../context/ContractContext';
-import type { DecodedEventLog, DecodedFunctionData, ContractAbi } from '../types';
 import { Chain } from 'viem';
-import {
-  findContractByAddress,
-  loadAbiForContract,
-  decodeTransactionWithAbi,
-} from '../utils/transactionDecoder';
 import TransactionCard from './TransactionCard';
 
 interface BlockExplorerProps {
   chain: Chain;
 }
 
-interface TransactionWithDecoded {
+interface TransactionData {
   transaction: Transaction;
   receipt: TransactionReceipt;
-  decodedInput: DecodedFunctionData | { error: string } | null;
-  decodedEvents: DecodedEventLog[];
-  contractName: string | null;
-  contractAbi: ContractAbi | null;
-  expandedEvents: Record<number, boolean>;
 }
 
 export default function BlockExplorer({ chain }: BlockExplorerProps) {
-  const {
-    deploymentsFile,
-    selectedNetwork,
-    selectedDeployment,
-    abisFolderHandle,
-  } = useContract();
-
   const [blockNumber, setBlockNumber] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [blockData, setBlockData] = useState<Block | null>(null);
-  const [transactions, setTransactions] = useState<TransactionWithDecoded[]>([]);
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [lastFetchedBlock, setLastFetchedBlock] = useState<string>('');
   const [expandedTransactions, setExpandedTransactions] = useState<Record<number, boolean>>({});
 
@@ -97,7 +78,7 @@ export default function BlockExplorer({ chain }: BlockExplorerProps) {
         return;
       }
 
-      const transactionsWithDecoded: TransactionWithDecoded[] = [];
+      const transactionsList: TransactionData[] = [];
 
       for (const txHash of txHashes) {
         try {
@@ -111,58 +92,21 @@ export default function BlockExplorer({ chain }: BlockExplorerProps) {
             hash: txHash,
           });
 
-          // Auto-load contract ABI based on transaction's 'to' address
-          let contractName: string | null = null;
-          let contractAbi: ContractAbi | null = null;
-          let decodedInput: DecodedFunctionData | { error: string } | null = null;
-          let decodedEvents: DecodedEventLog[] = [];
-          const expandedEvents: Record<number, boolean> = {};
-
-          if (transaction.to) {
-            const matchingContract = findContractByAddress(
-              transaction.to,
-              deploymentsFile,
-              selectedNetwork,
-              selectedDeployment
-            );
-
-            if (matchingContract) {
-              contractName = matchingContract;
-              const abi = await loadAbiForContract(matchingContract, abisFolderHandle);
-              if (abi) {
-                contractAbi = abi;
-                const decoded = await decodeTransactionWithAbi(transaction, receipt, abi);
-                decodedInput = decoded.decodedInput;
-                decodedEvents = decoded.decodedEvents;
-
-                // Initialize expanded state for events
-                decodedEvents.forEach((event) => {
-                  expandedEvents[event.index] = event.decoded;
-                });
-              }
-            }
-          }
-
-          transactionsWithDecoded.push({
+          transactionsList.push({
             transaction,
             receipt,
-            decodedInput,
-            decodedEvents,
-            contractName,
-            contractAbi,
-            expandedEvents,
           });
         } catch (err) {
           console.error(`Failed to fetch transaction ${txHash}:`, err);
         }
       }
 
-      setTransactions(transactionsWithDecoded);
+      setTransactions(transactionsList);
       setLastFetchedBlock(blockNumber);
 
       toaster.success({
         title: 'Block loaded',
-        description: `Found ${transactionsWithDecoded.length} transaction${transactionsWithDecoded.length !== 1 ? 's' : ''}`,
+        description: `Found ${transactionsList.length} transaction${transactionsList.length !== 1 ? 's' : ''}`,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch block';
@@ -191,20 +135,6 @@ export default function BlockExplorer({ chain }: BlockExplorerProps) {
       ...prev,
       [index]: !prev[index]
     }));
-  };
-
-  const toggleEvent = (txIndex: number, eventIndex: number) => {
-    setTransactions(prev => {
-      const updated = [...prev];
-      updated[txIndex] = {
-        ...updated[txIndex],
-        expandedEvents: {
-          ...updated[txIndex].expandedEvents,
-          [eventIndex]: !updated[txIndex].expandedEvents[eventIndex]
-        }
-      };
-      return updated;
-    });
   };
 
   return (
@@ -294,17 +224,12 @@ export default function BlockExplorer({ chain }: BlockExplorerProps) {
                 <VStack gap={4} align="stretch">
                   {transactions.map((txData, txIndex) => (
                     <TransactionCard
-                      key={txIndex}
+                      key={txData.transaction.hash}
                       transaction={txData.transaction}
                       receipt={txData.receipt}
-                      decodedInput={txData.decodedInput}
-                      decodedEvents={txData.decodedEvents}
-                      contractName={txData.contractName}
                       index={txIndex}
                       isExpanded={expandedTransactions[txIndex] ?? false}
                       onToggle={() => toggleTransaction(txIndex)}
-                      expandedEvents={txData.expandedEvents}
-                      onToggleEvent={(eventIndex) => toggleEvent(txIndex, eventIndex)}
                     />
                   ))}
                 </VStack>
