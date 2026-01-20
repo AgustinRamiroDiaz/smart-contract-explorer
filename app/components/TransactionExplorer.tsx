@@ -131,7 +131,6 @@ export default function TransactionExplorer({
         <TransactionCard
           transaction={transactionData}
           receipt={receiptData}
-          index={0}
           isExpanded={isExpanded}
           onToggle={() => setIsExpanded(!isExpanded)}
         />

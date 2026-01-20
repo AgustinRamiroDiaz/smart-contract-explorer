@@ -227,7 +227,6 @@ export default function BlockExplorer({ chain }: BlockExplorerProps) {
                       key={txData.transaction.hash}
                       transaction={txData.transaction}
                       receipt={txData.receipt}
-                      index={txIndex}
                       isExpanded={expandedTransactions[txIndex] ?? false}
                       onToggle={() => toggleTransaction(txIndex)}
                     />

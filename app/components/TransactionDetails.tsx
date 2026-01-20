@@ -9,6 +9,7 @@ import {
   VStack,
   HStack,
   Collapsible,
+  Grid,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
 import { Transaction, TransactionReceipt, Hash } from 'viem';
@@ -48,44 +49,37 @@ export default function TransactionDetails({
         <Box layerStyle="card">
           <Box layerStyle="cardSection">
             <Heading size="md" mb={4}>Transaction Details</Heading>
-            <VStack gap={3} align="stretch">
-              <Box>
-                <Text textStyle="cardHeading">Block Number:</Text>
-                <Code layerStyle="codeInline" display="block">
-                  {transaction.blockNumber?.toString() || 'Pending'}
-                </Code>
-              </Box>
-              <Box>
-                <Text textStyle="cardHeading">From:</Text>
-                <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
-                  {transaction.from}
-                </Code>
-              </Box>
-              <Box>
-                <Text textStyle="cardHeading">To:</Text>
-                <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
-                  {transaction.to || 'Contract Creation'}
-                </Code>
-              </Box>
-              <Box>
-                <Text textStyle="cardHeading">Value:</Text>
-                <Code layerStyle="codeInline" display="block">
-                  {transaction.value.toString()} wei
-                </Code>
-              </Box>
-              <Box>
-                <Text textStyle="cardHeading">Gas Used:</Text>
-                <Code layerStyle="codeInline" display="block">
-                  {receipt?.gasUsed?.toString() || 'N/A'}
-                </Code>
-              </Box>
-              <Box>
-                <Text textStyle="cardHeading">Status:</Text>
-                <Code layerStyle="codeInline" display="block">
-                  {receipt?.status === 'success' ? '✓ Success' : '✗ Failed'}
-                </Code>
-              </Box>
-            </VStack>
+            <Grid templateColumns="120px 1fr" gap={3} alignItems="center">
+              <Text textStyle="cardHeading">Block Number</Text>
+              <Code layerStyle="codeInline">
+                {transaction.blockNumber?.toString() || 'Pending'}
+              </Code>
+
+              <Text textStyle="cardHeading">From</Text>
+              <Code layerStyle="codeInline" whiteSpace="pre-wrap" wordBreak="break-all">
+                {transaction.from}
+              </Code>
+
+              <Text textStyle="cardHeading">To</Text>
+              <Code layerStyle="codeInline" whiteSpace="pre-wrap" wordBreak="break-all">
+                {transaction.to || 'Contract Creation'}
+              </Code>
+
+              <Text textStyle="cardHeading">Value</Text>
+              <Code layerStyle="codeInline">
+                {transaction.value.toString()} wei
+              </Code>
+
+              <Text textStyle="cardHeading">Gas Used</Text>
+              <Code layerStyle="codeInline">
+                {receipt?.gasUsed?.toString() || 'N/A'}
+              </Code>
+
+              <Text textStyle="cardHeading">Status</Text>
+              <Code layerStyle="codeInline">
+                {receipt?.status === 'success' ? '✓ Success' : '✗ Failed'}
+              </Code>
+            </Grid>
           </Box>
         </Box>
       )}

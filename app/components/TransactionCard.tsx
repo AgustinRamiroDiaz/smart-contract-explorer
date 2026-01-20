@@ -26,7 +26,6 @@ import TransactionDetails from './TransactionDetails';
 interface TransactionCardProps {
   transaction: Transaction;
   receipt: TransactionReceipt;
-  index: number;
   isExpanded: boolean;
   onToggle: () => void;
 }
@@ -34,7 +33,6 @@ interface TransactionCardProps {
 export default function TransactionCard({
   transaction,
   receipt,
-  index,
   isExpanded,
   onToggle,
 }: TransactionCardProps) {
@@ -167,13 +165,13 @@ export default function TransactionCard({
         transition="all 0.2s"
         tabIndex={0}
         aria-expanded={isExpanded}
-        aria-label={`Transaction ${index + 1}`}
+        aria-label={`Transaction ${transaction.hash}`}
       >
         <Text fontSize="lg">{isExpanded ? '▼' : '▶'}</Text>
         <VStack align="start" flex={1} gap={1}>
           <HStack>
-            <Text fontWeight="bold" fontFamily="mono" fontSize="sm">
-              Transaction #{index + 1}
+            <Text fontWeight="bold" fontSize="sm">
+              Transaction
             </Text>
             {selectedContract && (
               <Text fontSize="xs" color="blue.fg" fontWeight="semibold">
@@ -182,7 +180,7 @@ export default function TransactionCard({
             )}
           </HStack>
           <Text fontSize="xs" color="gray.600" fontFamily="mono">
-            {transaction.hash.slice(0, 20)}...
+            {transaction.hash}
           </Text>
         </VStack>
         <Text fontSize="xs" color={receipt.status === 'success' ? 'green.solid' : 'red.solid'} fontWeight="semibold">
@@ -246,7 +244,7 @@ export default function TransactionCard({
               decodedEvents={decodedEvents}
               expandedEvents={expandedEvents}
               onToggleEvent={toggleEvent}
-              showHeader={false}
+              showHeader={true}
             />
           </Box>
         </Collapsible.Content>
