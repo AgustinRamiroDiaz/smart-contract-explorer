@@ -40,6 +40,10 @@ export default function Sidebar() {
     handleSelectAbisFolder,
     handleReconfigure,
     abisFolderHandle,
+    rpcUrl,
+    setRpcUrl,
+    wsUrl,
+    setWsUrl,
   } = useContract();
 
   const networkNames = Object.keys(deploymentsFile);
@@ -335,6 +339,34 @@ export default function Sidebar() {
                 bg={{ base: 'white' }}
                 _dark={{ bg: 'gray.800' }}
                 fontSize="sm"
+                fontFamily="mono"
+              />
+            </Field.Root>
+
+            <Heading size="sm" mt={2}>RPC Endpoints</Heading>
+
+            <Field.Root>
+              <Field.Label fontSize="sm" fontWeight="semibold">RPC URL:</Field.Label>
+              <Input
+                value={rpcUrl}
+                onChange={(e) => setRpcUrl(e.target.value)}
+                placeholder="https://..."
+                bg={{ base: 'white' }}
+                _dark={{ bg: 'gray.800' }}
+                fontSize="xs"
+                fontFamily="mono"
+              />
+            </Field.Root>
+
+            <Field.Root>
+              <Field.Label fontSize="sm" fontWeight="semibold">WebSocket URL:</Field.Label>
+              <Input
+                value={wsUrl}
+                onChange={(e) => setWsUrl(e.target.value)}
+                placeholder="wss://..."
+                bg={{ base: 'white' }}
+                _dark={{ bg: 'gray.800' }}
+                fontSize="xs"
                 fontFamily="mono"
               />
             </Field.Root>

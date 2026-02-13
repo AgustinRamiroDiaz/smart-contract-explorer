@@ -6,7 +6,11 @@ import { injected } from 'wagmi/connectors'
 // Re-export mainnet for use in tests
 export { mainnet }
 
-// Define GenLayer Testnet
+// Default RPC endpoints
+export const DEFAULT_RPC_URL = 'https://zksync-os-testnet-genlayer.zksync.dev';
+export const DEFAULT_WS_URL = 'wss://zksync-os-testnet-genlayer.zksync.dev/ws';
+
+// Define GenLayer Testnet with default RPC
 export const genlayerTestnet = defineChain({
   id: 4221,
   name: 'GenLayer Testnet',
@@ -18,10 +22,12 @@ export const genlayerTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://genlayer-testnet.rpc.caldera.xyz/http'],
+      http: [DEFAULT_RPC_URL],
+      webSocket: [DEFAULT_WS_URL],
     },
     public: {
-      http: ['https://genlayer-testnet.rpc.caldera.xyz/http'],
+      http: [DEFAULT_RPC_URL],
+      webSocket: [DEFAULT_WS_URL],
     },
   },
   blockExplorers: {
@@ -32,6 +38,36 @@ export const genlayerTestnet = defineChain({
   },
 })
 
+// Create a GenLayer chain definition with custom RPC URLs
+export function createGenlayerChain(rpcUrl: string, wsUrl: string) {
+  return defineChain({
+    id: 4221,
+    name: 'GenLayer Testnet',
+    network: 'genlayer-testnet',
+    nativeCurrency: {
+      decimals: 18,
+      name: 'GenLayer',
+      symbol: 'GEN',
+    },
+    rpcUrls: {
+      default: {
+        http: [rpcUrl],
+        webSocket: [wsUrl],
+      },
+      public: {
+        http: [rpcUrl],
+        webSocket: [wsUrl],
+      },
+    },
+    blockExplorers: {
+      default: {
+        name: 'Explorer',
+        url: 'https://genlayer-testnet.explorer.caldera.xyz',
+      },
+    },
+  })
+}
+
 export const config = createConfig({
   chains: [genlayerTestnet, mainnet],
   connectors: [
@@ -41,7 +77,7 @@ export const config = createConfig({
   ],
   ssr: true,
   transports: {
-    [genlayerTestnet.id]: http(),
+    [genlayerTestnet.id]: http(DEFAULT_RPC_URL),
     [mainnet.id]: http(),
   },
 })

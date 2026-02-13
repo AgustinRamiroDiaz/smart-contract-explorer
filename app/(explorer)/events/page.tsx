@@ -8,11 +8,10 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import EventLogsExplorer from '@/app/components/EventLogsExplorer';
-import { genlayerTestnet } from '@/app/wagmi';
 import { useContract } from '@/app/context/ContractContext';
 
 function EventsPageContent() {
-  const { contractAbi, contractAddress } = useContract();
+  const { contractAbi, contractAddress, activeChain } = useContract();
 
   return (
     <VStack gap={6} align="stretch">
@@ -20,7 +19,7 @@ function EventsPageContent() {
         <EventLogsExplorer
           contractAddress={contractAddress}
           contractAbi={contractAbi}
-          chain={genlayerTestnet}
+          chain={activeChain}
         />
       ) : (
         <Center py={12}>

@@ -2,7 +2,7 @@
  * Shared TypeScript types for the Contract Explorer application
  */
 
-import { Chain, Hash, TransactionReceipt, Transaction } from 'viem';
+import type { Chain, Hash, TransactionReceipt, Transaction } from 'viem';
 
 // ============================================================================
 // ABI Types
@@ -171,6 +171,11 @@ export interface ContractContextType {
   isInitializing: boolean;
   showSetupModal: boolean;
   setShowSetupModal: (show: boolean) => void;
+  rpcUrl: string;
+  setRpcUrl: (url: string) => void;
+  wsUrl: string;
+  setWsUrl: (url: string) => void;
+  activeChain: Chain;
   handleSelectDeploymentsFile: () => Promise<void>;
   handleSelectAbisFolder: () => Promise<void>;
   handleSetupComplete: (

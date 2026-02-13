@@ -8,12 +8,14 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import TransactionExplorer from '@/app/components/TransactionExplorer';
-import { genlayerTestnet } from '@/app/wagmi';
+import { useContract } from '@/app/context/ContractContext';
 
 function TransactionsPageContent() {
+  const { activeChain } = useContract();
+
   return (
     <VStack gap={6} align="stretch">
-      <TransactionExplorer chain={genlayerTestnet} />
+      <TransactionExplorer chain={activeChain} />
     </VStack>
   );
 }

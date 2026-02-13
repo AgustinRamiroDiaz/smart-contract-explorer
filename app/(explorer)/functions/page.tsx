@@ -13,15 +13,9 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import FunctionCard from '@/app/components/FunctionCard';
-import { genlayerTestnet, mainnet } from '@/app/wagmi';
+import { mainnet } from '@/app/wagmi';
 import { useContract } from '@/app/context/ContractContext';
 import type { AbiFunction } from '@/app/types';
-
-// Chain lookup for URL parameter support
-const chains = {
-  'genlayer-testnet': genlayerTestnet,
-  'mainnet': mainnet,
-} as const;
 
 // Generate function signature for unique keys
 function generateFunctionSignature(func: AbiFunction): string {
@@ -29,15 +23,20 @@ function generateFunctionSignature(func: AbiFunction): string {
   return `${func.name}(${paramTypes})`;
 }
 
+// Chain lookup for URL parameter support
+const chainsByName = {
+  'mainnet': mainnet,
+} as const;
+
 function FunctionsPageContent() {
-  const { contractAbi, contractAddress, loadingAbi } = useContract();
+  const { contractAbi, contractAddress, loadingAbi, activeChain } = useContract();
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
 
-  // Get chain from URL parameter or default to genlayerTestnet
-  const chainParam = searchParams?.get('chain') as keyof typeof chains | null;
-  const selectedChain = chainParam && chains[chainParam] ? chains[chainParam] : genlayerTestnet;
+  // Get chain from URL parameter or default to activeChain (GenLayer with custom RPC)
+  const chainParam = searchParams?.get('chain') as keyof typeof chainsByName | null;
+  const selectedChain = chainParam && chainsByName[chainParam] ? chainsByName[chainParam] : activeChain;
 
   // Global keyboard shortcuts
   useEffect(() => {

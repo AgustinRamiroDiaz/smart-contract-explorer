@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode, useCallback } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   saveFolderHandle,
@@ -14,6 +14,7 @@ import {
   readJsonFile
 } from '../utils/storage';
 import { toaster } from '@/components/ui/toaster';
+import { genlayerTestnet, createGenlayerChain, DEFAULT_RPC_URL, DEFAULT_WS_URL } from '../wagmi';
 import type { ContractContextType, DeploymentsFile, ContractAbi } from '../types';
 
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
@@ -37,6 +38,26 @@ export function ContractProvider({ children }: { children: ReactNode }) {
   const [loadingAbiList, setLoadingAbiList] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
+  const [rpcUrl, setRpcUrlState] = useState<string>(DEFAULT_RPC_URL);
+  const [wsUrl, setWsUrlState] = useState<string>(DEFAULT_WS_URL);
+
+  // Create a dynamic chain definition based on current RPC URLs
+  const activeChain = useMemo(
+    () => (rpcUrl === DEFAULT_RPC_URL && wsUrl === DEFAULT_WS_URL)
+      ? genlayerTestnet
+      : createGenlayerChain(rpcUrl, wsUrl),
+    [rpcUrl, wsUrl]
+  );
+
+  const setRpcUrl = useCallback((url: string) => {
+    setRpcUrlState(url);
+    localStorage.setItem('rpcUrl', url);
+  }, []);
+
+  const setWsUrl = useCallback((url: string) => {
+    setWsUrlState(url);
+    localStorage.setItem('wsUrl', url);
+  }, []);
 
   // Helper function to update URL params
   const updateURLParams = useCallback((network: string, deployment: string, contract: string) => {
@@ -97,6 +118,12 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       setIsInitializing(true);
       let hasDeployments = false;
       let hasFolderHandle = false;
+
+      // Restore RPC/WS URLs from localStorage
+      const savedRpcUrl = localStorage.getItem('rpcUrl');
+      const savedWsUrl = localStorage.getItem('wsUrl');
+      if (savedRpcUrl) setRpcUrlState(savedRpcUrl);
+      if (savedWsUrl) setWsUrlState(savedWsUrl);
 
       try {
         // 1. Try to restore deployments file handle from IndexedDB
@@ -425,6 +452,11 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     isInitializing,
     showSetupModal,
     setShowSetupModal,
+    rpcUrl,
+    setRpcUrl,
+    wsUrl,
+    setWsUrl,
+    activeChain,
     handleSelectDeploymentsFile,
     handleSelectAbisFolder,
     handleSetupComplete,

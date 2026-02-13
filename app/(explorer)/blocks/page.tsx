@@ -8,12 +8,14 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import BlockExplorer from '@/app/components/BlockExplorer';
-import { genlayerTestnet } from '@/app/wagmi';
+import { useContract } from '@/app/context/ContractContext';
 
 function BlocksPageContent() {
+  const { activeChain } = useContract();
+
   return (
     <VStack gap={6} align="stretch">
-      <BlockExplorer chain={genlayerTestnet} />
+      <BlockExplorer chain={activeChain} />
     </VStack>
   );
 }
