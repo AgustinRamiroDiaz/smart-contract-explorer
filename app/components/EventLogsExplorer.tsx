@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPublicClient, http, decodeEventLog, parseAbiItem, Hash } from 'viem';
-import type { Chain } from 'viem';
+import { createPublicClient, http, decodeEventLog, Hash } from 'viem';
 import {
   Box,
   Text,
@@ -239,7 +238,7 @@ export default function EventLogsExplorer({
             args: decoded.args as Record<string, unknown>,
             decoded: true,
           };
-        } catch (err) {
+        } catch {
           return {
             index,
             blockNumber: log.blockNumber,
@@ -304,7 +303,7 @@ export default function EventLogsExplorer({
         title: 'Command copied',
         description: `${type === 'foundry' ? 'Foundry' : 'ZKsync CLI'} command copied to clipboard`,
       });
-    } catch (err) {
+    } catch {
       toaster.error({
         title: 'Failed to copy',
         description: 'Could not copy command to clipboard',

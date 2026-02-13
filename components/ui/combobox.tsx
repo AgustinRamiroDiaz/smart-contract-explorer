@@ -1,10 +1,9 @@
 "use client"
 
-import type { ButtonProps, InputProps } from "@chakra-ui/react"
 import { Combobox as ChakraCombobox, Portal } from "@chakra-ui/react"
 import * as React from "react"
 
-interface ComboboxLabelProps extends ChakraCombobox.LabelProps {}
+type ComboboxLabelProps = ChakraCombobox.LabelProps;
 
 export const ComboboxLabel = React.forwardRef<
   HTMLLabelElement,
@@ -32,7 +31,7 @@ export const ComboboxInput = React.forwardRef<
   )
 })
 
-interface ComboboxContentProps extends ChakraCombobox.ContentProps {}
+type ComboboxContentProps = ChakraCombobox.ContentProps;
 
 export const ComboboxContent = React.forwardRef<
   HTMLDivElement,
@@ -47,7 +46,7 @@ export const ComboboxContent = React.forwardRef<
   )
 })
 
-interface ComboboxItemProps extends ChakraCombobox.ItemProps {}
+type ComboboxItemProps = ChakraCombobox.ItemProps;
 
 export const ComboboxItem = React.forwardRef<
   HTMLDivElement,
@@ -62,7 +61,7 @@ export const ComboboxItem = React.forwardRef<
   )
 })
 
-interface ComboboxRootProps extends ChakraCombobox.RootProps {}
+type ComboboxRootProps = ChakraCombobox.RootProps;
 
 export const ComboboxRoot = React.forwardRef<
   HTMLDivElement,

@@ -6,7 +6,7 @@ import { decodeFunctionData, decodeEventLog, Transaction, TransactionReceipt, Ha
 import type { DecodedEventLog, DecodedFunctionData, AbiFunction, AbiEvent, ContractAbi, DeploymentsFile } from '../types';
 
 // Utility function to convert BigInts to strings for JSON display
-export function serializeBigInts(obj: unknown): any {
+export function serializeBigInts(obj: unknown): unknown {
   if (typeof obj === 'bigint') {
     return obj.toString();
   }
@@ -14,7 +14,7 @@ export function serializeBigInts(obj: unknown): any {
     return obj.map(serializeBigInts);
   }
   if (obj !== null && typeof obj === 'object') {
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = serializeBigInts(value);
     }
@@ -120,7 +120,7 @@ export async function decodeTransactionWithAbi(
         args: decoded.args || [],
         signature: matchingFunction ? `${matchingFunction.name}(${matchingFunction.inputs.map((input) => `${input.type} ${input.name}`).join(', ')})` : decoded.functionName
       };
-    } catch (err) {
+    } catch {
       decodedInput = { error: 'Failed to decode input data. The ABI might not match this transaction.' };
     }
   }
@@ -163,7 +163,7 @@ export async function decodeTransactionWithAbi(
           data: log.data,
           decoded: false,
         };
-      } catch (err) {
+      } catch {
         return {
           index,
           address: log.address,

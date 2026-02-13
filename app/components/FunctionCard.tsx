@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { createPublicClient, http } from 'viem';
-import type { Chain } from 'viem';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import {
   Box,
@@ -357,6 +356,7 @@ export default function FunctionCard({
         description: `Transaction ${hash.slice(0, 10)}... has been sent`,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash]);
 
   useEffect(() => {
@@ -401,7 +401,7 @@ export default function FunctionCard({
         title: 'Command copied',
         description: `${type === 'foundry' ? 'Foundry' : 'ZKsync CLI'} command copied to clipboard`,
       });
-    } catch (err) {
+    } catch {
       toaster.error({
         title: 'Failed to copy',
         description: 'Could not copy command to clipboard',

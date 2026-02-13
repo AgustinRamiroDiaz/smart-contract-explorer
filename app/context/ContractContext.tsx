@@ -230,12 +230,13 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     };
 
     initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle deployments file selection
   const handleSelectDeploymentsFile = async () => {
     try {
-      // @ts-ignore - File System Access API
+      // @ts-expect-error - File System Access API
       const [fileHandle] = await window.showOpenFilePicker({
         types: [{
           description: 'JSON Files',
@@ -268,7 +269,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
   // Handle ABIs folder selection
   const handleSelectAbisFolder = async () => {
     try {
-      // @ts-ignore - File System Access API
+      // @ts-expect-error - File System Access API
       const dirHandle = await window.showDirectoryPicker();
       setAbisFolderHandle(dirHandle);
 
@@ -377,6 +378,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     } else {
       setContractAbi(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContractState, abisFolderHandle]);
 
   // Load ABI from the selected folder
@@ -468,7 +470,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
   // Expose test helpers for E2E testing
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // @ts-ignore - Expose for E2E testing
+      // @ts-expect-error - Expose for E2E testing
       window.__contractContext = {
         setContractAddress,
         setContractAbi,
@@ -479,7 +481,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     }
     return () => {
       if (typeof window !== 'undefined') {
-        // @ts-ignore
+        // @ts-expect-error - Clean up E2E testing helper
         delete window.__contractContext;
       }
     };

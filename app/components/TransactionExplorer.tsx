@@ -87,6 +87,7 @@ export default function TransactionExplorer({
     if (isValidHash && hasChanged && !loading) {
       handleExplore();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txHash]);
 
   return (

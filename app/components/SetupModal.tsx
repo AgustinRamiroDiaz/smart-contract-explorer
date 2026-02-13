@@ -36,7 +36,7 @@ export default function SetupModal({
   const handleSelectFile = async () => {
     try {
       setLoading(true);
-      // @ts-ignore - File System Access API
+      // @ts-expect-error - File System Access API
       const [handle] = await window.showOpenFilePicker({
         types: [{
           description: 'JSON Files',
@@ -64,7 +64,7 @@ export default function SetupModal({
   const handleSelectFolder = async () => {
     try {
       setLoading(true);
-      // @ts-ignore - File System Access API
+      // @ts-expect-error - File System Access API
       const dirHandle = await window.showDirectoryPicker();
       setFolderHandle(dirHandle);
       setError(null);
@@ -108,6 +108,7 @@ export default function SetupModal({
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onSkip, canComplete]);
 
   return (

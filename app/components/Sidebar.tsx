@@ -213,7 +213,7 @@ export default function Sidebar() {
 └── ...`}
                         </Box>
                         <Text fontSize="xs">
-                          Each .sol directory should contain a JSON file with the contract's ABI.
+                          Each .sol directory should contain a JSON file with the contract&apos;s ABI.
                         </Text>
                       </Tooltip.Content>
                     </Tooltip.Positioner>

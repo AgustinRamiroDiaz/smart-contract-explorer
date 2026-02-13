@@ -126,7 +126,7 @@ function FunctionsPageContent() {
             <Center py={12}>
               <VStack gap={2}>
                 <Text color="gray.500" fontSize="lg">
-                  No functions found matching "{searchTerm}"
+                  No functions found matching &quot;{searchTerm}&quot;
                 </Text>
                 <Text color="gray.400" fontSize="sm">
                   Try a different search term
@@ -181,7 +181,7 @@ function FunctionsPageContent() {
       {contractAbi && contractAddress && allFunctions.length === 0 && (
         <Center py={12}>
           <Text color="gray.600">
-            No functions found in this contract's ABI
+            No functions found in this contract&apos;s ABI
           </Text>
         </Center>
       )}

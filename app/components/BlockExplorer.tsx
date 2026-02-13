@@ -128,6 +128,7 @@ export default function BlockExplorer({ chain }: BlockExplorerProps) {
     if (isValidBlock && hasChanged && !loading) {
       handleExplore();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blockNumber]);
 
   const toggleTransaction = (index: number) => {

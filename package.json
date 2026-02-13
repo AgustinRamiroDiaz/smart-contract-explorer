@@ -6,8 +6,10 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
+    "lint": "eslint .",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "prepare": "husky"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.27.1",
@@ -28,9 +30,16 @@
     "@testing-library/react": "^16.3.2",
     "@types/node": "20.19.21",
     "@types/react": "18.2.45",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.6",
+    "husky": "^9.1.7",
     "jsdom": "^27.4.0",
+    "lint-staged": "^16.2.7",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17",
     "yaml": "^2.4.2"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs}": "eslint"
   }
 }

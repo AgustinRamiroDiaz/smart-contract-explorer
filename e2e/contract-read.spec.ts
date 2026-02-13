@@ -46,7 +46,7 @@ async function setupContract(page: import("@playwright/test").Page) {
 
   // Wait for the page to load and context to be available
   await page.waitForFunction(() => {
-    // @ts-ignore
+    // @ts-expect-error - E2E testing helper
     return window.__contractContext !== undefined;
   }, { timeout: 10000 });
 
@@ -66,7 +66,7 @@ async function setupContract(page: import("@playwright/test").Page) {
 
   // Inject contract configuration via the test helper
   await page.evaluate(({ address, abi }) => {
-    // @ts-ignore - Test helper exposed by ContractContext
+    // @ts-expect-error - Test helper exposed by ContractContext
     const ctx = window.__contractContext;
     ctx.setContractAddress(address);
     ctx.setContractAbi(abi);

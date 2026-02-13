@@ -12,7 +12,7 @@ import {
   Grid,
 } from '@chakra-ui/react';
 import { JsonEditor } from 'json-edit-react';
-import { Transaction, TransactionReceipt, Hash } from 'viem';
+import { Transaction, TransactionReceipt } from 'viem';
 import type { DecodedEventLog, DecodedFunctionData } from '../types';
 import { serializeBigInts } from '../utils/transactionDecoder';
 

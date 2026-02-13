@@ -91,14 +91,14 @@ export async function requestFolderPermission(
   handle: FileSystemDirectoryHandle
 ): Promise<boolean> {
   try {
-    // @ts-ignore - File System Access API
+    // @ts-expect-error - File System Access API
     const permission = await handle.queryPermission({ mode: 'read' });
 
     if (permission === 'granted') {
       return true;
     }
 
-    // @ts-ignore - File System Access API
+    // @ts-expect-error - File System Access API
     const requestResult = await handle.requestPermission({ mode: 'read' });
     return requestResult === 'granted';
   } catch (error) {
@@ -169,14 +169,14 @@ export async function requestFilePermission(
   handle: FileSystemFileHandle
 ): Promise<boolean> {
   try {
-    // @ts-ignore - File System Access API
+    // @ts-expect-error - File System Access API
     const permission = await handle.queryPermission({ mode: 'read' });
 
     if (permission === 'granted') {
       return true;
     }
 
-    // @ts-ignore - File System Access API
+    // @ts-expect-error - File System Access API
     const requestResult = await handle.requestPermission({ mode: 'read' });
     return requestResult === 'granted';
   } catch (error) {
