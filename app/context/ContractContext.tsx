@@ -17,6 +17,7 @@ import { toaster } from '@/components/ui/toaster';
 import { genlayerTestnet, createGenlayerChain, DEFAULT_RPC_URL, DEFAULT_WS_URL } from '../wagmi';
 import type { ContractContextType, DeploymentsFile, ContractAbi } from '../types';
 import { findBestAbiMatch } from '../utils/abiMatcher';
+import { getAutoSelectedNetwork, getAutoSelectedDeployment } from '../utils/autoSelection';
 
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
 
@@ -361,6 +362,26 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('selectedDeployment', selectedDeploymentState);
     }
   }, [selectedDeploymentState]);
+
+  // Auto-select network when there's only one option
+  useEffect(() => {
+    if (!selectedNetworkState) {
+      const autoNetwork = getAutoSelectedNetwork(deploymentsFile);
+      if (autoNetwork) {
+        setSelectedNetwork(autoNetwork);
+      }
+    }
+  }, [deploymentsFile, selectedNetworkState, setSelectedNetwork]);
+
+  // Auto-select deployment when there's only one option
+  useEffect(() => {
+    if (selectedNetworkState && !selectedDeploymentState) {
+      const autoDeployment = getAutoSelectedDeployment(deploymentsFile, selectedNetworkState);
+      if (autoDeployment) {
+        setSelectedDeployment(autoDeployment);
+      }
+    }
+  }, [deploymentsFile, selectedNetworkState, selectedDeploymentState, setSelectedDeployment]);
 
   // Update contract address when deployment or contract is selected
   useEffect(() => {
