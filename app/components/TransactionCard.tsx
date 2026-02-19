@@ -17,7 +17,6 @@ import { useContract } from '../context/ContractContext';
 import type { DecodedEventLog, DecodedFunctionData } from '../types';
 import {
   findContractByAddress,
-  loadAbiForContract,
   decodeTransactionWithAbi,
   getAvailableContracts,
 } from '../utils/transactionDecoder';
@@ -40,15 +39,14 @@ export default function TransactionCard({
     deploymentsFile,
     selectedNetwork,
     selectedDeployment,
-    abisFolderHandle,
     availableAbis,
+    lookupAbi,
   } = useContract();
 
   const [selectedContract, setSelectedContract] = useState<string>('');
   const [decodedInput, setDecodedInput] = useState<DecodedFunctionData | { error: string } | null>(null);
   const [decodedEvents, setDecodedEvents] = useState<DecodedEventLog[]>([]);
   const [expandedEvents, setExpandedEvents] = useState<Record<number, boolean>>({});
-  const [loadingAbi, setLoadingAbi] = useState<boolean>(false);
   const [wasAutoInferred, setWasAutoInferred] = useState<boolean>(false);
   const [initialized, setInitialized] = useState<boolean>(false);
 
@@ -75,7 +73,7 @@ export default function TransactionCard({
         setSelectedContract(matchingContract);
         setWasAutoInferred(true);
 
-        const abi = await loadAbiForContract(matchingContract, abisFolderHandle, availableAbis);
+        const abi = lookupAbi(matchingContract);
         if (abi) {
           const { decodedInput: newDecodedInput, decodedEvents: newDecodedEvents } =
             await decodeTransactionWithAbi(transaction, receipt, abi);
@@ -93,7 +91,7 @@ export default function TransactionCard({
     };
 
     autoDetectContract();
-  }, [transaction, receipt, deploymentsFile, selectedNetwork, selectedDeployment, abisFolderHandle, initialized]);
+  }, [transaction, receipt, deploymentsFile, selectedNetwork, selectedDeployment, lookupAbi, initialized]);
 
   const handleContractChange = async (contractName: string) => {
     setSelectedContract(contractName);
@@ -105,9 +103,7 @@ export default function TransactionCard({
       return;
     }
 
-    setLoadingAbi(true);
-    const abi = await loadAbiForContract(contractName, abisFolderHandle, availableAbis);
-    setLoadingAbi(false);
+    const abi = lookupAbi(contractName);
 
     if (abi) {
       const { decodedInput: newDecodedInput, decodedEvents: newDecodedEvents } =
@@ -120,11 +116,6 @@ export default function TransactionCard({
         initialExpandedState[event.index] = event.decoded;
       });
       setExpandedEvents(initialExpandedState);
-
-      toaster.success({
-        title: 'Contract loaded',
-        description: `Loaded ABI for ${contractName}`,
-      });
     } else {
       toaster.error({
         title: 'Failed to load ABI',
@@ -202,13 +193,8 @@ export default function TransactionCard({
                       (auto-detected)
                     </Text>
                   )}
-                  {loadingAbi && (
-                    <Text as="span" ml={2} fontSize="xs" color="gray.500" fontWeight="normal">
-                      (loading...)
-                    </Text>
-                  )}
                 </Field.Label>
-                <NativeSelectRoot size="sm" disabled={loadingAbi || !selectedNetwork || !selectedDeployment}>
+                <NativeSelectRoot size="sm" disabled={!selectedNetwork || !selectedDeployment}>
                   <NativeSelectField
                     value={selectedContract}
                     onChange={(e) => handleContractChange(e.target.value)}
@@ -229,7 +215,7 @@ export default function TransactionCard({
                     ))}
                   </NativeSelectField>
                 </NativeSelectRoot>
-                {!loadingAbi && availableContracts.length > 0 && !selectedContract && (
+                {availableContracts.length > 0 && !selectedContract && (
                   <Text fontSize="xs" color="gray.600" mt={1}>
                     {availableContracts.length} contract{availableContracts.length !== 1 ? 's' : ''} available
                   </Text>

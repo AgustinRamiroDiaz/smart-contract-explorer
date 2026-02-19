@@ -69,7 +69,11 @@ async function setupContract(page: import("@playwright/test").Page) {
     // @ts-expect-error - Test helper exposed by ContractContext
     const ctx = window.__contractContext;
     ctx.setContractAddress(address);
-    ctx.setContractAbi(abi);
+    // Set ABI via cache so the derived contractAbi picks it up
+    const cache = new Map();
+    cache.set('TestContract', abi);
+    ctx.setAbiCache(cache);
+    ctx.setSelectedContract('TestContract');
   }, { address: WETH_ADDRESS, abi: WETH_ABI });
 
   // Wait for the UI to update with the functions (use heading to be specific)

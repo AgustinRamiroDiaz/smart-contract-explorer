@@ -18,10 +18,9 @@ export default defineConfig({
   // Artifacts folder where screenshots, videos, and traces are stored.
   outputDir: "test-results/",
 
-  // Run your local dev server before starting the tests:
-  // https://playwright.dev/docs/test-advanced#launching-a-development-web-server-during-the-tests
+  // Build and serve production output for tests (more representative of real usage)
   webServer: {
-    command: `npm run dev -- --port ${PORT}`,
+    command: `npm run build && npx serve out -l ${PORT}`,
     url: baseURL,
     timeout: 120 * 1000,
     reuseExistingServer: !process.env.CI,

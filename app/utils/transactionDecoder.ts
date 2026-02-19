@@ -58,8 +58,21 @@ export function findContractByAddress(
 export async function loadAbiForContract(
   contractName: string,
   abisFolderHandle: FileSystemDirectoryHandle | null,
-  availableAbis?: Set<string>
+  availableAbis?: Set<string>,
+  abiCache?: Map<string, ContractAbi>
 ): Promise<ContractAbi | null> {
+  // Fast path: look up from in-memory cache
+  if (abiCache) {
+    const direct = abiCache.get(contractName);
+    if (direct) return direct;
+
+    if (availableAbis) {
+      const match = findBestAbiMatch(contractName, availableAbis);
+      if (match) return abiCache.get(match.abiName) ?? null;
+    }
+    return null;
+  }
+
   if (!abisFolderHandle) {
     return null;
   }

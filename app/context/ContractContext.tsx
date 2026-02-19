@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useMemo, ReactNode, useCallback } from 'react';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { createContext, useContext, useState, useEffect, useMemo, useRef, ReactNode, useCallback } from 'react';
+import { useSearchParams, usePathname } from 'next/navigation';
 import {
   saveFolderHandle,
   getFolderHandle,
@@ -22,7 +22,6 @@ import { getAutoSelectedNetwork, getAutoSelectedDeployment } from '../utils/auto
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
 
 export function ContractProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
@@ -32,11 +31,10 @@ export function ContractProvider({ children }: { children: ReactNode }) {
   const [selectedDeploymentState, setSelectedDeploymentState] = useState<string>('');
   const [selectedContractState, setSelectedContractState] = useState<string>('');
   const [contractAddress, setContractAddress] = useState<string>('');
-  const [contractAbi, setContractAbi] = useState<ContractAbi | null>(null);
-  const [loadingAbi, setLoadingAbi] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [abisFolderHandle, setAbisFolderHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  const [availableAbis, setAvailableAbis] = useState<Set<string>>(new Set());
+  const [abiCache, setAbiCache] = useState<Map<string, ContractAbi>>(new Map());
+  const availableAbis = useMemo(() => new Set(abiCache.keys()), [abiCache]);
   const [loadingAbiList, setLoadingAbiList] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
@@ -61,6 +59,21 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('wsUrl', url);
   }, []);
 
+  // Look up an ABI from the cache, using fuzzy matching as fallback
+  const lookupAbi = useCallback((contractName: string): ContractAbi | null => {
+    const direct = abiCache.get(contractName);
+    if (direct) return direct;
+
+    const match = findBestAbiMatch(contractName, availableAbis);
+    return match ? abiCache.get(match.abiName) ?? null : null;
+  }, [abiCache, availableAbis]);
+
+  // Derive contractAbi synchronously from cache — no useEffect delay
+  const contractAbi = useMemo(
+    () => selectedContractState ? lookupAbi(selectedContractState) : null,
+    [selectedContractState, lookupAbi]
+  );
+
   // Helper function to update URL params
   const updateURLParams = useCallback((network: string, deployment: string, contract: string) => {
     const params = new URLSearchParams(searchParams?.toString());
@@ -84,8 +97,8 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     }
 
     const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-    router.replace(newUrl, { scroll: false });
-  }, [searchParams, pathname, router]);
+    window.history.replaceState(null, '', newUrl);
+  }, [searchParams, pathname]);
 
   // Wrapper setters that update both state and URL
   const setSelectedNetwork = useCallback((network: string) => {
@@ -316,32 +329,50 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     setShowSetupModal(true);
   };
 
-  // Scan the ABIs folder for available contracts
-  const scanAbisFolder = async (dirHandle: FileSystemDirectoryHandle) => {
-    setLoadingAbiList(true);
-    const foundAbis = new Set<string>();
+  // Parse all ABIs from a folder into a Map
+  type AsyncIterableDirectoryHandle = FileSystemDirectoryHandle & {
+    values(): AsyncIterableIterator<FileSystemHandle>;
+  };
 
-    try {
-      // TypeScript doesn't have the full FileSystemDirectoryHandle API, so we need to cast
-      type AsyncIterableDirectoryHandle = FileSystemDirectoryHandle & {
-        values(): AsyncIterableIterator<FileSystemHandle>;
-      };
+  interface ArtifactFile {
+    abi: ContractAbi;
+    [key: string]: unknown;
+  }
 
-      for await (const entry of (dirHandle as AsyncIterableDirectoryHandle).values()) {
-        if (entry.kind === 'directory' && entry.name.endsWith('.sol')) {
-          const contractName = entry.name.replace('.sol', '');
+  const parseAbisFromFolder = async (dirHandle: FileSystemDirectoryHandle): Promise<Map<string, ContractAbi>> => {
+    const cache = new Map<string, ContractAbi>();
 
-          try {
-            // Check if the contract's JSON file exists
-            await (entry as FileSystemDirectoryHandle).getFileHandle(`${contractName}.json`);
-            foundAbis.add(contractName);
-          } catch {
-            // File doesn't exist, skip
+    for await (const entry of (dirHandle as AsyncIterableDirectoryHandle).values()) {
+      if (entry.kind === 'directory' && entry.name.endsWith('.sol')) {
+        const contractName = entry.name.replace('.sol', '');
+
+        try {
+          const solDir = entry as FileSystemDirectoryHandle;
+          const jsonFile = await solDir.getFileHandle(`${contractName}.json`);
+          const file = await jsonFile.getFile();
+          const text = await file.text();
+
+          const data = JSON.parse(text) as ContractAbi | ArtifactFile;
+          const abi: ContractAbi = Array.isArray(data) ? data : data.abi;
+
+          if (abi && Array.isArray(abi)) {
+            cache.set(contractName, abi);
           }
+        } catch {
+          // File doesn't exist or parse error, skip
         }
       }
+    }
 
-      setAvailableAbis(foundAbis);
+    return cache;
+  };
+
+  // Scan the ABIs folder for available contracts and load all ABIs
+  const scanAbisFolder = async (dirHandle: FileSystemDirectoryHandle) => {
+    setLoadingAbiList(true);
+    try {
+      const cache = await parseAbisFromFolder(dirHandle);
+      setAbiCache(cache);
     } catch (err) {
       console.error('Error scanning ABIs folder:', err);
       setError('Failed to scan folder: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -393,60 +424,43 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedNetworkState, selectedDeploymentState, selectedContractState, deploymentsFile]);
 
-  // Load ABI when contract is selected
-  useEffect(() => {
-    if (selectedContractState && abisFolderHandle) {
-      loadAbiFromFolder(selectedContractState);
-    } else {
-      setContractAbi(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedContractState, abisFolderHandle]);
+  // Poll the ABIs folder for changes
+  const abisFolderHandleRef = useRef(abisFolderHandle);
+  abisFolderHandleRef.current = abisFolderHandle;
 
-  // Load ABI from the selected folder
-  const loadAbiFromFolder = async (contractName: string) => {
+  useEffect(() => {
     if (!abisFolderHandle) return;
 
-    setLoadingAbi(true);
-    try {
-      // Resolve actual ABI name via fuzzy matching
-      let resolvedName = contractName;
-      if (!availableAbis.has(contractName)) {
-        const match = findBestAbiMatch(contractName, availableAbis);
-        if (match) {
-          resolvedName = match.abiName;
-        }
+    const poll = async () => {
+      const handle = abisFolderHandleRef.current;
+      if (!handle) return;
+
+      try {
+        const newCache = await parseAbisFromFolder(handle);
+
+        setAbiCache(prev => {
+          // Only update if something changed to avoid unnecessary re-renders
+          if (prev.size !== newCache.size) return newCache;
+          for (const [key, value] of newCache) {
+            const existing = prev.get(key);
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(value)) {
+              return newCache;
+            }
+          }
+          for (const key of prev.keys()) {
+            if (!newCache.has(key)) return newCache;
+          }
+          return prev;
+        });
+      } catch {
+        // Silently fail on poll errors
       }
+    };
 
-      const solDir = await abisFolderHandle.getDirectoryHandle(`${resolvedName}.sol`);
-      const jsonFile = await solDir.getFileHandle(`${resolvedName}.json`);
-      const file = await jsonFile.getFile();
-      const text = await file.text();
-
-      interface ArtifactFile {
-        abi: ContractAbi;
-        [key: string]: unknown;
-      }
-
-      const data = JSON.parse(text) as ContractAbi | ArtifactFile;
-
-      // Handle both raw ABI arrays and artifact objects with an abi field
-      const abi: ContractAbi = Array.isArray(data) ? data : data.abi;
-
-      if (!abi || !Array.isArray(abi)) {
-        setError('Invalid ABI file format');
-        setContractAbi(null);
-      } else {
-        setContractAbi(abi);
-        setError(null);
-      }
-    } catch (err) {
-      console.error('Error loading ABI:', err);
-      setContractAbi(null);
-    } finally {
-      setLoadingAbi(false);
-    }
-  };
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abisFolderHandle]);
 
   // Update document title based on selected contract
   useEffect(() => {
@@ -471,15 +485,13 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     contractAddress,
     setContractAddress,
     contractAbi,
-    setContractAbi,
-    loadingAbi,
-    setLoadingAbi,
     error,
     setError,
     abisFolderHandle,
     setAbisFolderHandle,
+    abiCache,
     availableAbis,
-    setAvailableAbis,
+    lookupAbi,
     loadingAbiList,
     setLoadingAbiList,
     isInitializing,
@@ -495,7 +507,6 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     handleSetupComplete,
     handleReconfigure,
     scanAbisFolder,
-    loadAbiFromFolder,
   };
 
   // Expose test helpers for E2E testing
@@ -504,7 +515,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       // @ts-expect-error - Expose for E2E testing
       window.__contractContext = {
         setContractAddress,
-        setContractAbi,
+        setAbiCache,
         setSelectedNetwork: setSelectedNetworkState,
         setSelectedDeployment: setSelectedDeploymentState,
         setSelectedContract: setSelectedContractState,

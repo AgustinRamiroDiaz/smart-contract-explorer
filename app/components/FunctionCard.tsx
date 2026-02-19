@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPublicClient, http } from 'viem';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import {
@@ -12,7 +12,6 @@ import {
   VStack,
   HStack,
   Badge,
-  Collapsible,
   Code,
   Alert,
   Grid,
@@ -117,6 +116,97 @@ function generateZksyncCommand(
   return `${command} --chain "${chainValue}" --contract "${contractAddress}" --method "${signature}"${argsString}${isReadFunction ? outputType : ''}${blockFlag}${valueFlag}`;
 }
 
+// State reported by WriteHooksProvider to the parent FunctionCard
+interface WriteHookState {
+  isConnected: boolean;
+  hash: `0x${string}` | undefined;
+  isWritePending: boolean;
+  isConfirming: boolean;
+  isConfirmed: boolean;
+}
+
+const defaultWriteState: WriteHookState = {
+  isConnected: false,
+  hash: undefined,
+  isWritePending: false,
+  isConfirming: false,
+  isConfirmed: false,
+};
+
+// Deferred wagmi hooks — only mounted when a write function card is expanded.
+// This avoids calling useWriteContract/useWaitForTransactionReceipt/useAccount
+// for every collapsed card, which was the main performance bottleneck during
+// contract switching (50 cards × 3 hooks each = ~190ms).
+function WriteHooksProvider({
+  onStateChange,
+  writeContractRef,
+  funcName,
+}: {
+  onStateChange: (state: WriteHookState) => void;
+  writeContractRef: React.MutableRefObject<((params: Record<string, unknown>) => void) | null>;
+  funcName: string;
+}) {
+  const { isConnected } = useAccount();
+  const { writeContract, data: hash, isPending: isWritePending } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+
+  // Expose writeContract to parent via ref
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    writeContractRef.current = writeContract as any;
+    return () => { writeContractRef.current = null; };
+  }, [writeContract, writeContractRef]);
+
+  // Report hook state to parent
+  useEffect(() => {
+    onStateChange({ isConnected, hash, isWritePending, isConfirming, isConfirmed });
+  }, [isConnected, hash, isWritePending, isConfirming, isConfirmed, onStateChange]);
+
+  // Toast: transaction sent
+  useEffect(() => {
+    if (hash && !isConfirming && !isConfirmed) {
+      toaster.info({
+        title: 'Transaction sent',
+        description: `Transaction ${hash.slice(0, 10)}... has been sent`,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash]);
+
+  // Toast: transaction confirmed
+  useEffect(() => {
+    if (isConfirmed && hash) {
+      toaster.success({
+        title: 'Transaction confirmed',
+        description: `${funcName}() executed successfully`,
+      });
+    }
+  }, [isConfirmed, hash, funcName]);
+
+  return null;
+}
+
+// Deferred color-mode read — only mounts when there is a result to display,
+// avoiding 50 context subscriptions for collapsed cards.
+function ResultDisplay({ data }: { data: SerializableValue }) {
+  const { colorMode } = useColorMode();
+  return (
+    <Box layerStyle="codeBlock" width="full" overflowX="auto">
+      <Box width="full" css={{ '& > div': { width: '100% !important', maxWidth: '100% !important' } }}>
+        <JsonEditor
+          data={data}
+          setData={() => {}}
+          rootName="result"
+          restrictEdit={true}
+          restrictDelete={true}
+          restrictAdd={true}
+          theme={colorMode === 'dark' ? githubDarkTheme : githubLightTheme}
+        />
+      </Box>
+    </Box>
+  );
+}
+
 export default function FunctionCard({
   func,
   contractAddress,
@@ -134,12 +224,29 @@ export default function FunctionCard({
   const [blockNumber, setBlockNumber] = useState<string>('');
   const [value, setValue] = useState<string>('');
 
-  const { isConnected } = useAccount();
-  const { writeContract, data: hash, isPending: isWritePending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  });
-  const { colorMode } = useColorMode();
+  // Write hook state — deferred to WriteHooksProvider (only mounts when expanded)
+  const [writeState, setWriteState] = useState<WriteHookState>(defaultWriteState);
+
+  // Reset state when the function changes (e.g., contract switch with index-based keys).
+  // This is React's "adjusting state when a prop changes" pattern — setState during render
+  // causes React to restart the render with the updated state, no extra commit.
+  const [prevFuncSig, setPrevFuncSig] = useState(() => generateFunctionSignature(func));
+  const currentFuncSig = generateFunctionSignature(func);
+  if (currentFuncSig !== prevFuncSig) {
+    setPrevFuncSig(currentFuncSig);
+    setIsExpanded(false);
+    setArgs({});
+    setValidationErrors({});
+    setTouchedFields({});
+    setResult(null);
+    setLoading(false);
+    setError(null);
+    setIsCommandsModalOpen(false);
+    setBlockNumber('');
+    setValue('');
+    setWriteState(defaultWriteState);
+  }
+  const writeContractRef = useRef<((params: Record<string, unknown>) => void) | null>(null);
 
   const isReadFunction = func.stateMutability === 'view' || func.stateMutability === 'pure';
 
@@ -290,8 +397,8 @@ export default function FunctionCard({
     }
   };
 
-  const callWriteFunction = async () => {
-    if (!isConnected) {
+  const callWriteFunction = useCallback(async () => {
+    if (!writeState.isConnected) {
       const errorMessage = 'Please connect your wallet first';
       setError(errorMessage);
       toaster.error({
@@ -337,7 +444,7 @@ export default function FunctionCard({
         writeParams.value = BigInt(value);
       }
 
-      writeContract(writeParams);
+      writeContractRef.current?.(writeParams as unknown as Record<string, unknown>);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send transaction';
       setError(errorMessage);
@@ -346,27 +453,8 @@ export default function FunctionCard({
         description: errorMessage,
       });
     }
-  };
-
-  // Show toast notifications for transaction status changes
-  useEffect(() => {
-    if (hash && !isConfirming && !isConfirmed) {
-      toaster.info({
-        title: 'Transaction sent',
-        description: `Transaction ${hash.slice(0, 10)}... has been sent`,
-      });
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hash]);
-
-  useEffect(() => {
-    if (isConfirmed && hash) {
-      toaster.success({
-        title: 'Transaction confirmed',
-        description: `${func.name}() executed successfully`,
-      });
-    }
-  }, [isConfirmed, hash, func.name]);
+  }, [writeState.isConnected, func, args, contractAddress, contractAbi, value]);
 
   const callFunction = isReadFunction ? callReadFunction : callWriteFunction;
 
@@ -411,6 +499,15 @@ export default function FunctionCard({
 
   return (
     <Box layerStyle="card" mb={4}>
+      {/* Deferred write hooks — only mount when a write card is expanded */}
+      {isExpanded && !isReadFunction && (
+        <WriteHooksProvider
+          onStateChange={setWriteState}
+          writeContractRef={writeContractRef}
+          funcName={func.name}
+        />
+      )}
+
       {/* Header */}
       <HStack
         as="button"
@@ -457,179 +554,163 @@ export default function FunctionCard({
             }
             callFunction();
           }}
-          loading={isReadFunction ? loading : (isWritePending || isConfirming)}
+          loading={isReadFunction ? loading : (writeState.isWritePending || writeState.isConfirming)}
           loadingText={
             isReadFunction
               ? "Calling..."
-              : isWritePending
+              : writeState.isWritePending
               ? "Sending..."
               : "Confirming..."
           }
           colorScheme={getStateMutabilityColorScheme()}
           size="sm"
-          disabled={!isFormReady() || (!isReadFunction && !isConnected)}
+          disabled={!isFormReady() || (!isReadFunction && !writeState.isConnected)}
         >
           {isReadFunction ? 'Execute' : 'Send'}
         </Button>
       </HStack>
 
-      {/* Expandable Content */}
-      <Collapsible.Root open={isExpanded}>
-        <Collapsible.Content>
-        <Box layerStyle="cardSection">
-          {/* Two-column layout for Parameters and Block Number/Value */}
-          <Grid
-            templateColumns={isReadFunction || func.stateMutability === 'payable' ? "1fr 300px" : "1fr"}
-            gap={6}
-            alignItems="start"
-          >
-            {/* Input Fields */}
-            {func.inputs.length > 0 && (
-              <VStack gap={3} align="stretch">
-                <Text fontWeight="bold">Parameters:</Text>
-                {func.inputs.map((input, idx) => {
-                  const hasError = touchedFields[input.name] && validationErrors[input.name];
-                  return (
-                    <Field.Root key={idx} invalid={!!hasError}>
-                      <Grid templateColumns="200px 1fr" gap={3} alignItems="start">
-                        <Field.Label textStyle="label" pt={2}>
-                          <Text as="span" fontWeight="medium">{input.name}</Text>
-                          <Text as="span" ml={2} color="fg.muted" textStyle="monoCode">
-                            ({input.type})
-                          </Text>
-                        </Field.Label>
-                        <Box>
-                          {input.type === 'address' ? (
-                            <AddressInput
-                              value={args[input.name] || ''}
-                              onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
-                              onBlur={() => handleInputBlur(input.name)}
-                              onKeyDown={handleInputKeyDown}
-                              placeholder={getPlaceholderForType(input.type)}
-                            />
-                          ) : (
-                            <Input
-                              value={args[input.name] || ''}
-                              onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
-                              onBlur={() => handleInputBlur(input.name)}
-                              onKeyDown={handleInputKeyDown}
-                              placeholder={getPlaceholderForType(input.type)}
-                              textStyle="mono"
-                            />
-                          )}
-                          {hasError && (
-                            <Field.ErrorText textStyle="helperText" mt={1}>
-                              {validationErrors[input.name]}
-                            </Field.ErrorText>
-                          )}
-                        </Box>
-                      </Grid>
-                    </Field.Root>
-                  );
-                })}
-              </VStack>
-            )}
+      {/* Expandable Content — plain conditional render (no Collapsible wrapper overhead) */}
+      {isExpanded && <Box layerStyle="cardSection">
+        {/* Two-column layout for Parameters and Block Number/Value */}
+        <Grid
+          templateColumns={isReadFunction || func.stateMutability === 'payable' ? "1fr 300px" : "1fr"}
+          gap={6}
+          alignItems="start"
+        >
+          {/* Input Fields */}
+          {func.inputs.length > 0 && (
+            <VStack gap={3} align="stretch">
+              <Text fontWeight="bold">Parameters:</Text>
+              {func.inputs.map((input, idx) => {
+                const hasError = touchedFields[input.name] && validationErrors[input.name];
+                return (
+                  <Field.Root key={idx} invalid={!!hasError}>
+                    <Grid templateColumns="200px 1fr" gap={3} alignItems="start">
+                      <Field.Label textStyle="label" pt={2}>
+                        <Text as="span" fontWeight="medium">{input.name}</Text>
+                        <Text as="span" ml={2} color="fg.muted" textStyle="monoCode">
+                          ({input.type})
+                        </Text>
+                      </Field.Label>
+                      <Box>
+                        {input.type === 'address' ? (
+                          <AddressInput
+                            value={args[input.name] || ''}
+                            onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
+                            onBlur={() => handleInputBlur(input.name)}
+                            onKeyDown={handleInputKeyDown}
+                            placeholder={getPlaceholderForType(input.type)}
+                          />
+                        ) : (
+                          <Input
+                            value={args[input.name] || ''}
+                            onChange={(e) => handleArgChange(input.name, e.target.value, input.type)}
+                            onBlur={() => handleInputBlur(input.name)}
+                            onKeyDown={handleInputKeyDown}
+                            placeholder={getPlaceholderForType(input.type)}
+                            textStyle="mono"
+                          />
+                        )}
+                        {hasError && (
+                          <Field.ErrorText textStyle="helperText" mt={1}>
+                            {validationErrors[input.name]}
+                          </Field.ErrorText>
+                        )}
+                      </Box>
+                    </Grid>
+                  </Field.Root>
+                );
+              })}
+            </VStack>
+          )}
 
-            {/* Block Number Input (for read functions) */}
-            {isReadFunction && (
-              <VStack gap={3} align="stretch">
-                <Text fontWeight="bold">Block Number:</Text>
-                <Field.Root>
-                  <VStack gap={2} align="stretch">
-                    <Input
-                      value={blockNumber}
-                      onChange={(e) => setBlockNumber(e.target.value)}
-                      placeholder="Latest block"
-                      textStyle="mono"
-                      type="number"
-                    />
-                    <Text fontSize="xs" color="fg.muted">
-                      Leave empty for latest block
-                    </Text>
-                  </VStack>
-                </Field.Root>
-              </VStack>
-            )}
+          {/* Block Number Input (for read functions) */}
+          {isReadFunction && (
+            <VStack gap={3} align="stretch">
+              <Text fontWeight="bold">Block Number:</Text>
+              <Field.Root>
+                <VStack gap={2} align="stretch">
+                  <Input
+                    value={blockNumber}
+                    onChange={(e) => setBlockNumber(e.target.value)}
+                    placeholder="Latest block"
+                    textStyle="mono"
+                    type="number"
+                  />
+                  <Text fontSize="xs" color="fg.muted">
+                    Leave empty for latest block
+                  </Text>
+                </VStack>
+              </Field.Root>
+            </VStack>
+          )}
 
-            {/* Value Input (for payable functions) */}
-            {func.stateMutability === 'payable' && (
-              <VStack gap={3} align="stretch">
-                <Text fontWeight="bold">Value (wei):</Text>
-                <Field.Root>
-                  <VStack gap={2} align="stretch">
-                    <Input
-                      value={value}
-                      onChange={(e) => setValue(e.target.value)}
-                      placeholder="0"
-                      textStyle="mono"
-                      type="number"
-                    />
-                    <Text fontSize="xs" color="fg.muted">
-                      Amount of wei to send with transaction
-                    </Text>
-                  </VStack>
-                </Field.Root>
-              </VStack>
-            )}
-          </Grid>
+          {/* Value Input (for payable functions) */}
+          {func.stateMutability === 'payable' && (
+            <VStack gap={3} align="stretch">
+              <Text fontWeight="bold">Value (wei):</Text>
+              <Field.Root>
+                <VStack gap={2} align="stretch">
+                  <Input
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder="0"
+                    textStyle="mono"
+                    type="number"
+                  />
+                  <Text fontSize="xs" color="fg.muted">
+                    Amount of wei to send with transaction
+                  </Text>
+                </VStack>
+              </Field.Root>
+            </VStack>
+          )}
+        </Grid>
 
-          {/* Loading Skeleton for Read Functions */}
-          {loading && isReadFunction && (
-            <Box borderRadius="md" p={4} bg="bg.muted" mb={4}>
-              <Text fontWeight="bold" mb={2}>Result:</Text>
-              <VStack gap={2} align="stretch">
-                <Skeleton height="20px" />
-                <Skeleton height="20px" />
-                <Skeleton height="20px" width="80%" />
-              </VStack>
+        {/* Loading Skeleton for Read Functions */}
+        {loading && isReadFunction && (
+          <Box borderRadius="md" p={4} bg="bg.muted" mb={4}>
+            <Text fontWeight="bold" mb={2}>Result:</Text>
+            <VStack gap={2} align="stretch">
+              <Skeleton height="20px" />
+              <Skeleton height="20px" />
+              <Skeleton height="20px" width="80%" />
+            </VStack>
+          </Box>
+        )}
+
+        {/* Write Function Status */}
+        {!isReadFunction && writeState.hash && (
+          <Alert.Root status={writeState.isConfirmed ? "success" : "info"} borderRadius="md" mb={4}>
+            <Alert.Indicator />
+            <Box width="full">
+              <Text fontWeight="bold" mb={1}>
+                {writeState.isConfirming ? 'Transaction Pending' : writeState.isConfirmed ? 'Transaction Confirmed' : 'Transaction Sent'}
+              </Text>
+              <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
+                {writeState.hash}
+              </Code>
             </Box>
-          )}
+          </Alert.Root>
+        )}
 
-          {/* Write Function Status */}
-          {!isReadFunction && hash && (
-            <Alert.Root status={isConfirmed ? "success" : "info"} borderRadius="md" mb={4}>
-              <Alert.Indicator />
-              <Box width="full">
-                <Text fontWeight="bold" mb={1}>
-                  {isConfirming ? 'Transaction Pending' : isConfirmed ? 'Transaction Confirmed' : 'Transaction Sent'}
-                </Text>
-                <Code layerStyle="codeInline" display="block" whiteSpace="pre-wrap" wordBreak="break-all">
-                  {hash}
-                </Code>
-              </Box>
-            </Alert.Root>
-          )}
+        {/* Error Display */}
+        {error && (
+          <Alert.Root status="error" borderRadius="md" mb={4}>
+            <Alert.Indicator />
+            <Alert.Title textStyle="label">{error}</Alert.Title>
+          </Alert.Root>
+        )}
 
-          {/* Error Display */}
-          {error && (
-            <Alert.Root status="error" borderRadius="md" mb={4}>
-              <Alert.Indicator />
-              <Alert.Title textStyle="label">{error}</Alert.Title>
-            </Alert.Root>
-          )}
+        {/* Result Display (for read functions) */}
+        {result !== null && isReadFunction && (
+          <ResultDisplay data={serializeBigInts(result)} />
+        )}
+      </Box>}
 
-          {/* Result Display (for read functions) */}
-          {result !== null && isReadFunction && (
-            <Box layerStyle="codeBlock" width="full" overflowX="auto">
-              <Box width="full" css={{ '& > div': { width: '100% !important', maxWidth: '100% !important' } }}>
-                <JsonEditor
-                  data={serializeBigInts(result)}
-                  setData={() => {}}
-                  rootName="result"
-                  restrictEdit={true}
-                  restrictDelete={true}
-                  restrictAdd={true}
-                  theme={colorMode === 'dark' ? githubDarkTheme : githubLightTheme}
-                />
-              </Box>
-            </Box>
-          )}
-        </Box>
-        </Collapsible.Content>
-      </Collapsible.Root>
-
-      {/* Commands Modal */}
-      <Dialog.Root open={isCommandsModalOpen} onOpenChange={(e) => setIsCommandsModalOpen(e.open)}>
+      {/* Commands Modal — only mount when open to avoid 50 Portals */}
+      {isCommandsModalOpen && <Dialog.Root open={isCommandsModalOpen} onOpenChange={(e) => setIsCommandsModalOpen(e.open)}>
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
@@ -694,7 +775,7 @@ export default function FunctionCard({
             </Dialog.Content>
           </Dialog.Positioner>
         </Portal>
-      </Dialog.Root>
+      </Dialog.Root>}
     </Box>
   );
 }

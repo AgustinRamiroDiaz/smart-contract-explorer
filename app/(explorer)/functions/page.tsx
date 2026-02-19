@@ -29,7 +29,7 @@ const chainsByName = {
 } as const;
 
 function FunctionsPageContent() {
-  const { contractAbi, contractAddress, loadingAbi, activeChain } = useContract();
+  const { contractAbi, contractAddress, loadingAbiList, activeChain } = useContract();
   const [searchTerm, setSearchTerm] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
@@ -109,12 +109,12 @@ function FunctionsPageContent() {
         </Box>
       )}
 
-      {/* Loading ABI indicator */}
-      {loadingAbi && (
+      {/* Loading ABIs indicator */}
+      {loadingAbiList && (
         <Center py={12}>
           <VStack>
             <Spinner size="lg" />
-            <Text color="gray.600">Loading contract ABI...</Text>
+            <Text color="gray.600">Loading contract ABIs...</Text>
           </VStack>
         </Center>
       )}
@@ -142,9 +142,9 @@ function FunctionsPageContent() {
                   <Text fontSize="sm" color="gray.600" mb={4}>
                     {readFunctions.length} read function{readFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
                   </Text>
-                  {readFunctions.map((func) => (
+                  {readFunctions.map((func, index) => (
                     <FunctionCard
-                      key={generateFunctionSignature(func)}
+                      key={`read-${index}`}
                       func={func}
                       contractAddress={contractAddress}
                       contractAbi={contractAbi}
@@ -161,9 +161,9 @@ function FunctionsPageContent() {
                   <Text fontSize="sm" color="gray.600" mb={4}>
                     {writeFunctions.length} write function{writeFunctions.length !== 1 ? 's' : ''} {searchTerm ? 'found' : 'available'}
                   </Text>
-                  {writeFunctions.map((func) => (
+                  {writeFunctions.map((func, index) => (
                     <FunctionCard
-                      key={generateFunctionSignature(func)}
+                      key={`write-${index}`}
                       func={func}
                       contractAddress={contractAddress}
                       contractAbi={contractAbi}
@@ -187,7 +187,7 @@ function FunctionsPageContent() {
       )}
 
       {/* Empty state when no contract selected */}
-      {!loadingAbi && !contractAbi && (
+      {!loadingAbiList && !contractAbi && (
         <Center py={12}>
           <VStack gap={2}>
             <Text color="gray.500" fontSize="lg">

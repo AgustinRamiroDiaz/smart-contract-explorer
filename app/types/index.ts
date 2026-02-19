@@ -157,15 +157,13 @@ export interface ContractContextType {
   contractAddress: string;
   setContractAddress: (address: string) => void;
   contractAbi: ContractAbi | null;
-  setContractAbi: (abi: ContractAbi | null) => void;
-  loadingAbi: boolean;
-  setLoadingAbi: (loading: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
   abisFolderHandle: FileSystemDirectoryHandle | null;
   setAbisFolderHandle: (handle: FileSystemDirectoryHandle | null) => void;
+  abiCache: Map<string, ContractAbi>;
   availableAbis: Set<string>;
-  setAvailableAbis: (abis: Set<string>) => void;
+  lookupAbi: (contractName: string) => ContractAbi | null;
   loadingAbiList: boolean;
   setLoadingAbiList: (loading: boolean) => void;
   isInitializing: boolean;
@@ -184,7 +182,6 @@ export interface ContractContextType {
   ) => Promise<void>;
   handleReconfigure: () => void;
   scanAbisFolder: (dirHandle: FileSystemDirectoryHandle) => Promise<void>;
-  loadAbiFromFolder: (contractName: string) => Promise<void>;
 }
 
 // ============================================================================
