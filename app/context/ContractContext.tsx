@@ -16,6 +16,7 @@ import {
 import { toaster } from '@/components/ui/toaster';
 import { genlayerTestnet, createGenlayerChain, DEFAULT_RPC_URL, DEFAULT_WS_URL } from '../wagmi';
 import type { ContractContextType, DeploymentsFile, ContractAbi } from '../types';
+import { findBestAbiMatch } from '../utils/abiMatcher';
 
 const ContractContext = createContext<ContractContextType | undefined>(undefined);
 
@@ -387,8 +388,17 @@ export function ContractProvider({ children }: { children: ReactNode }) {
 
     setLoadingAbi(true);
     try {
-      const solDir = await abisFolderHandle.getDirectoryHandle(`${contractName}.sol`);
-      const jsonFile = await solDir.getFileHandle(`${contractName}.json`);
+      // Resolve actual ABI name via fuzzy matching
+      let resolvedName = contractName;
+      if (!availableAbis.has(contractName)) {
+        const match = findBestAbiMatch(contractName, availableAbis);
+        if (match) {
+          resolvedName = match.abiName;
+        }
+      }
+
+      const solDir = await abisFolderHandle.getDirectoryHandle(`${resolvedName}.sol`);
+      const jsonFile = await solDir.getFileHandle(`${resolvedName}.json`);
       const file = await jsonFile.getFile();
       const text = await file.text();
 

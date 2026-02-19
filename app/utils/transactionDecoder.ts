@@ -4,6 +4,7 @@
 
 import { decodeFunctionData, decodeEventLog, Transaction, TransactionReceipt, Hash } from 'viem';
 import type { DecodedEventLog, DecodedFunctionData, AbiFunction, AbiEvent, ContractAbi, DeploymentsFile } from '../types';
+import { findBestAbiMatch } from './abiMatcher';
 
 // Utility function to convert BigInts to strings for JSON display
 export function serializeBigInts(obj: unknown): unknown {
@@ -56,15 +57,25 @@ export function findContractByAddress(
  */
 export async function loadAbiForContract(
   contractName: string,
-  abisFolderHandle: FileSystemDirectoryHandle | null
+  abisFolderHandle: FileSystemDirectoryHandle | null,
+  availableAbis?: Set<string>
 ): Promise<ContractAbi | null> {
   if (!abisFolderHandle) {
     return null;
   }
 
   try {
-    const solDir = await abisFolderHandle.getDirectoryHandle(`${contractName}.sol`);
-    const jsonFile = await solDir.getFileHandle(`${contractName}.json`);
+    // Resolve the actual ABI name via fuzzy matching when exact match isn't available
+    let resolvedName = contractName;
+    if (availableAbis && !availableAbis.has(contractName)) {
+      const match = findBestAbiMatch(contractName, availableAbis);
+      if (match) {
+        resolvedName = match.abiName;
+      }
+    }
+
+    const solDir = await abisFolderHandle.getDirectoryHandle(`${resolvedName}.sol`);
+    const jsonFile = await solDir.getFileHandle(`${resolvedName}.json`);
     const file = await jsonFile.getFile();
     const text = await file.text();
 
@@ -191,7 +202,7 @@ export function getAvailableContracts(
   return Object.keys(deploymentsFile[selectedNetwork]?.[selectedDeployment] || {}).filter(
     (key) => {
       const hasAddress = deploymentsFile[selectedNetwork][selectedDeployment][key]?.startsWith('0x');
-      const hasAbi = availableAbis.has(key);
+      const hasAbi = findBestAbiMatch(key, availableAbis) !== null;
       return hasAddress && hasAbi;
     }
   );

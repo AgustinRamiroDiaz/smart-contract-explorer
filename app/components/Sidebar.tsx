@@ -19,6 +19,7 @@ import { Tooltip } from '@chakra-ui/react';
 import { ConnectButton } from '@/app/components/ConnectButton';
 import { ThemeToggle } from '@/components/ui/theme-selector';
 import { useContract } from '@/app/context/ContractContext';
+import { findBestAbiMatch } from '@/app/utils/abiMatcher';
 
 export default function Sidebar() {
   const {
@@ -54,7 +55,7 @@ export default function Sidebar() {
     ? Object.keys(deploymentsFile[selectedNetwork]?.[selectedDeployment] || {}).filter(
         (key) => {
           const hasAddress = deploymentsFile[selectedNetwork][selectedDeployment][key]?.startsWith('0x');
-          const hasAbi = availableAbis.has(key);
+          const hasAbi = findBestAbiMatch(key, availableAbis) !== null;
           return hasAddress && hasAbi;
         }
       )

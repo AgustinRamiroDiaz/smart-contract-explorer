@@ -75,7 +75,7 @@ export default function TransactionCard({
         setSelectedContract(matchingContract);
         setWasAutoInferred(true);
 
-        const abi = await loadAbiForContract(matchingContract, abisFolderHandle);
+        const abi = await loadAbiForContract(matchingContract, abisFolderHandle, availableAbis);
         if (abi) {
           const { decodedInput: newDecodedInput, decodedEvents: newDecodedEvents } =
             await decodeTransactionWithAbi(transaction, receipt, abi);
@@ -106,7 +106,7 @@ export default function TransactionCard({
     }
 
     setLoadingAbi(true);
-    const abi = await loadAbiForContract(contractName, abisFolderHandle);
+    const abi = await loadAbiForContract(contractName, abisFolderHandle, availableAbis);
     setLoadingAbi(false);
 
     if (abi) {
