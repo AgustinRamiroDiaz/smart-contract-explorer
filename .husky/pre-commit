@@ -1,1 +1,7 @@
 npx lint-staged
+
+echo "Running unit tests..."
+npm test || exit 1
+
+echo "Running e2e tests..."
+npx playwright test || exit 1
